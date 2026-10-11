@@ -32,7 +32,7 @@ export default function ClipsView({savedClips,onSave,filterMuscle,filterSkill,fi
   const handleTouchStart=e=>touchStart.current=e.touches[0].clientY;
   const handleTouchEnd=e=>{if(!touchStart.current)return;const dy=touchStart.current-e.changedTouches[0].clientY;if(Math.abs(dy)>50){setIdx(i=>dy>0?Math.min(i+1,filtered.length-1):Math.max(i-1,0));}touchStart.current=null;};
   const colors=["#0a1a3a","#12082a","#0a2020","#0a1228","#150830"];
-  if(filtered.length===0)return<div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:"var(--muted)"}}><div style={{fontSize:40}}>🎬</div><div style={{fontSize:14}}>No clips match your filters</div></div>;
+  if(filtered.length===0)return<div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:"var(--muted)"}}><div style={{fontSize:40}}>🎬</div><div style={{fontSize:14}}>{CLIP_POSTS.length===0?"No clips yet":"No clips match your filters"}</div></div>;
   return(
     <div ref={containerRef} style={{height:"100%",overflow:"hidden",position:"relative",userSelect:"none"}} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {filtered.map((c,i)=>(

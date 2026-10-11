@@ -5,7 +5,8 @@ A mobile-style fitness app (React + Vite) with four tabs: Nutrition, Feed (socia
 ## Stack
 - React 18, Vite
 - No router/state library — state is local `useState` in `App.jsx`, passed down as props
-- No backend — all data is mock data in `src/data/`
+- No backend — user accounts and everything they log (posts, workouts, food, profile) are stored in the browser's `localStorage` via `src/utils/accounts.js`. `App.jsx` owns `accounts` + the session; tabs read `user` and write through `updateUser(patch)`. Passwords are salted PBKDF2 hashes (still client-side only — a real launch needs server auth).
+- New accounts start empty (`EMPTY_DATA`); stats, PRs and badges are derived from logged data. `src/data/` holds static reference data (exercise list, food DB, badge definitions) plus the remaining mock gym communities.
 - Styling is a single global stylesheet (`src/styles.css`), plain CSS custom properties (dark theme), no CSS framework
 
 ## Structure
@@ -18,7 +19,8 @@ A mobile-style fitness app (React + Vite) with four tabs: Nutrition, Feed (socia
   - `WorkoutTab.jsx` — exercise picker/logger against `WORKOUTS`
   - `ProfileTab.jsx` — profile, badges, PR announcements, settings
 - `src/data/` — static mock data (`foodDb.js`, `workouts.js`, `badges.js`, `social.js`)
-- `src/utils/helpers.js` — small pure helpers (`scaleFood`, `sumLog`, `makeInvite`)
+- `src/utils/helpers.js` — small pure helpers (food math, date keys/current week, `bestSets`/`trainingStats`, avatar image cropping)
+- `src/utils/accounts.js` — account store (localStorage), password rules + hashing, username/email validation
 
 ## Commands
 - `npm install` — install dependencies

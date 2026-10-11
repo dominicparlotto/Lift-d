@@ -11,7 +11,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .nav-btn svg{width:20px;height:20px;stroke-width:1.6;}
 .nav-bar{width:18px;height:2px;border-radius:2px;background:var(--grad);opacity:0;transition:opacity 0.2s;margin-top:-2px;}
 .nav-btn.active .nav-bar{opacity:1;}
-.content{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;position:relative;z-index:1;}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;position:relative;}
 .content::-webkit-scrollbar{display:none;}
 .header{padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;}
 .header-title{font-size:22px;font-weight:800;letter-spacing:-0.5px;}

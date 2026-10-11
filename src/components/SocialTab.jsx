@@ -1,13 +1,12 @@
 import { useState, useRef } from "react";
 import ClipsView from "./ClipsView";
-import { INITIAL_GYMS, MOCK_POSTS } from "../data/social";
-import { makeInvite } from "../utils/helpers";
+import { INITIAL_GYMS } from "../data/social";
+import { makeInvite, initials, timeAgo } from "../utils/helpers";
 
-export default function SocialTab({user,savedClips,onSaveClip}){
+export default function SocialTab({user,posts,updateUser}){
   const [liked,setLiked]=useState({});
   const [saved,setSaved]=useState({});
   const [boosted,setBoosted]=useState({});
-  const [followed,setFollowed]=useState({});
   const [view,setView]=useState("feed");
   const [searchQ,setSearchQ]=useState("");
   const [selectedGym,setSelectedGym]=useState(null);
@@ -16,7 +15,6 @@ export default function SocialTab({user,savedClips,onSaveClip}){
   const [gyms,setGyms]=useState(INITIAL_GYMS);
   const [messages,setMessages]=useState({general:[{user:"alex_lifts",text:"Morning everyone! Leg day 💪",time:"8:02am"},{user:"sarahfitness",text:"Nice! I'll be in around noon",time:"8:15am"},{user:"musclemike",text:"Anyone want to team up for bench?",time:"9:30am"}],powerlifting:[{user:"biglifts99",text:"Comp is in 3 weeks, who's competing?",time:"7:00am"}],nutrition:[{user:"sarahfitness",text:"Anyone tried high protein overnight oats?",time:"6:45am"}]});
   const [msgInput,setMsgInput]=useState("");
-  const [posts,setPosts]=useState(MOCK_POSTS);
   const [showUpload,setShowUpload]=useState(false);
   const [uploadCaption,setUploadCaption]=useState("");
   const [uploadFile,setUploadFile]=useState(null);
@@ -31,14 +29,16 @@ export default function SocialTab({user,savedClips,onSaveClip}){
   const fileRef=useRef();
 
   const filteredPosts=posts.filter(p=>{
-    if(searchQ&&!p.content.toLowerCase().includes(searchQ.toLowerCase())&&!p.user.includes(searchQ.toLowerCase()))return false;
+    if(searchQ&&!p.content.toLowerCase().includes(searchQ.toLowerCase())&&!p.author.username.toLowerCase().includes(searchQ.toLowerCase()))return false;
     if(filterMuscle!=="All"&&p.muscle!==filterMuscle&&p.muscle!=="All")return false;
     if(filterSkill!=="All"&&p.skill!==filterSkill&&p.skill!=="All")return false;
     return true;
   });
 
   function sendMsg(){if(!msgInput.trim())return;setMessages(prev=>({...prev,[activeChannel]:[...(prev[activeChannel]||[]),{user:user?.username||"You",text:msgInput,time:"now"}]}));setMsgInput("");}
-  function submitPost(){if(!uploadCaption.trim())return;setPosts(prev=>[{id:Date.now(),user:user?.username||"you",avatar:(user?.name||"JD").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),content:uploadCaption,likes:0,comments:0,time:"just now",color:"#4F8EF7",hasVideo:!!uploadFile,muscle:"All",skill:"All",equipment:"All",isCoach:false},...prev]);setUploadCaption("");setUploadFile(null);setShowUpload(false);}
+  function submitPost(){if(!uploadCaption.trim())return;updateUser(u=>({posts:[{id:crypto.randomUUID(),content:uploadCaption.trim(),hasVideo:!!uploadFile,createdAt:Date.now(),muscle:"All",skill:"All",equipment:"All"},...u.posts]}));setUploadCaption("");setUploadFile(null);setShowUpload(false);}
+  function toggleFollow(id){updateUser(u=>({following:u.following.includes(id)?u.following.filter(f=>f!==id):[...u.following,id]}));}
+  function toggleSaveClip(id){updateUser(u=>({savedClips:u.savedClips.includes(id)?u.savedClips.filter(c=>c!==id):[...u.savedClips,id]}));}
   function addGym(){if(!newGymName.trim())return;const newG={id:Date.now(),name:newGymName,location:newGymLoc||"Unknown",members:1,channels:["general"],invite:makeInvite(newGymName),leaderboard:[{user:user?.username||"you",score:0}]};setGyms(prev=>[...prev,newG]);setNewGymName("");setNewGymLoc("");setShowAddGym(false);}
   function addChannel(){if(!newCh.trim()||!selectedGym)return;const ch=newCh.toLowerCase().replace(/\s+/g,"-");setGyms(prev=>prev.map(g=>g.id===selectedGym.id?{...g,channels:[...g.channels,ch]}:g));setSelectedGym(prev=>({...prev,channels:[...prev.channels,ch]}));setActiveChannel(ch);setNewCh("");setShowAddCh(false);}
 
@@ -89,7 +89,7 @@ export default function SocialTab({user,savedClips,onSaveClip}){
       </div>
 
       {view==="clips"?(
-        <div style={{flex:1,overflow:"hidden"}}><ClipsView savedClips={savedClips} onSave={onSaveClip} filterMuscle={filterMuscle} filterSkill={filterSkill} filterEquip={filterEquip}/></div>
+        <div style={{flex:1,overflow:"hidden"}}><ClipsView savedClips={user.savedClips} onSave={toggleSaveClip} filterMuscle={filterMuscle} filterSkill={filterSkill} filterEquip={filterEquip}/></div>
       ):view==="community"?(
         <div style={{flex:1,overflow:"auto"}}>
           <div style={{padding:"8px 16px 4px"}}><div className="gps-banner" onClick={()=>setSelectedGym(gyms[0])}><span style={{fontSize:20}}>📍</span><div className="gps-text">Near <strong>Iron Valley Gym</strong> · Athens, GA<br/><span style={{fontSize:11,color:"var(--muted)"}}>Tap to join their chat</span></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div></div>
@@ -100,24 +100,29 @@ export default function SocialTab({user,savedClips,onSaveClip}){
       ):(
         <div style={{flex:1,overflow:"auto"}}>
           <div style={{padding:"10px 16px 4px",display:"flex",justifyContent:"flex-end"}}><button className="btn btn-sm" onClick={()=>setShowUpload(true)}>📹 Post</button></div>
-          {filteredPosts.map(post=>(
+          {posts.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🎬</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12,marginBottom:16}}>Be the first to share a workout, PR, or tip.</div><button className="btn btn-sm" onClick={()=>setShowUpload(true)}>📹 Create a post</button></div>}
+          {posts.length>0&&filteredPosts.length===0&&<div className="saved-empty"><div style={{fontSize:14}}>No posts match your search or filters.</div></div>}
+          {filteredPosts.map(post=>{
+            const a=post.author;
+            const following=user.following.includes(a.id);
+            return(
             <div key={post.id} className="post-card">
               <div className="post-header">
-                <div className="post-avatar" style={{background:`linear-gradient(135deg,${post.color},${post.color}88)`}}>{post.avatar}</div>
+                <div className="post-avatar" style={{background:"var(--grad)",overflow:"hidden"}}>{a.avatar?<img src={a.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials(a.name)}</div>
                 <div style={{flex:1}}>
-                  <div className="post-username">@{post.user}{post.isCoach&&<span className="coach-badge">✓ COACH</span>}</div>
-                  <div className="post-time">{post.time}</div>
+                  <div className="post-username">@{a.username}</div>
+                  <div className="post-time">{timeAgo(post.createdAt)}</div>
                 </div>
-                <button className="follow-btn" style={{background:followed[post.user]?"var(--glass)":"var(--grad)",border:followed[post.user]?"1px solid var(--border)":"none",color:"#fff",padding:"5px 12px"}} onClick={()=>setFollowed(p=>({...p,[post.user]:!p[post.user]}))}>
-                  {followed[post.user]?"Following":"Follow"}
-                </button>
+                {a.id!==user.id&&<button className="follow-btn" style={{background:following?"var(--glass)":"var(--grad)",border:following?"1px solid var(--border)":"none",color:"#fff",padding:"5px 12px"}} onClick={()=>toggleFollow(a.id)}>
+                  {following?"Following":"Follow"}
+                </button>}
               </div>
-              {post.hasVideo&&<div className="post-video"><div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 30% 40%,${post.color}28 0%,transparent 65%)`}}/><div className="play-btn"><svg width="14" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>}
+              {post.hasVideo&&<div className="post-video"><div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 30% 40%,#4F8EF728 0%,transparent 65%)"}}/><div className="play-btn"><svg width="14" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>}
               <div className="post-content">{post.content}</div>
               <div className="post-actions">
                 <button className={`action-btn ${liked[post.id]?"liked":""}`} onClick={()=>setLiked(p=>({...p,[post.id]:!p[post.id]}))}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill={liked[post.id]?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                  {post.likes+(liked[post.id]?1:0)}
+                  {liked[post.id]?1:0}
                 </button>
                 <button className={`action-btn ${saved[post.id]?"saved":""}`} onClick={()=>setSaved(p=>({...p,[post.id]:!p[post.id]}))}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill={saved[post.id]?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
@@ -130,7 +135,8 @@ export default function SocialTab({user,savedClips,onSaveClip}){
                 <button className="action-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
               </div>
             </div>
-          ))}
+            );
+          })}
           {showUpload&&<div className="modal-overlay" onClick={()=>setShowUpload(false)}><div className="modal-sheet" onClick={e=>e.stopPropagation()}><div className="modal-handle"/><div className="modal-title">New Post</div><div className="modal-sub">Share a workout clip. Videos must be under 5 minutes.</div><input ref={fileRef} type="file" accept="video/*,image/*" style={{display:"none"}} onChange={e=>setUploadFile(e.target.files[0])}/>{uploadFile?(<div style={{borderRadius:16,overflow:"hidden",height:130,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:14,position:"relative"}}><div style={{fontSize:40}}>🎥</div><div style={{position:"absolute",bottom:10,left:14,fontSize:11,color:"var(--muted)"}}>{uploadFile.name}</div><button onClick={()=>setUploadFile(null)} style={{position:"absolute",top:10,right:12,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:24,height:24,color:"#fff",cursor:"pointer",fontSize:12}}>✕</button></div>):(<div className="upload-area" onClick={()=>fileRef.current.click()}><div style={{fontSize:32,marginBottom:8}}>📹</div><div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Tap to upload video</div><div style={{fontSize:12,color:"var(--muted)"}}>MP4, MOV · max 5 minutes</div></div>)}<textarea className="input-field" placeholder="Write a caption…" value={uploadCaption} onChange={e=>setUploadCaption(e.target.value)} style={{width:"100%",minHeight:80,resize:"none",marginBottom:14}}/><button className="btn" style={{width:"100%"}} onClick={submitPost}>Share Post</button></div></div>}
         </div>
       )}

@@ -1,24 +1,27 @@
 import { useState, useRef } from "react";
-import { WORKOUTS, PERSONAL_RECORDS, SAMPLE_WEEK_LOG, WEEK_DAYS, TODAY_IDX } from "../data/workouts";
+import { WORKOUTS } from "../data/workouts";
 import { INITIAL_GYMS } from "../data/social";
+import { dateKey, shortDate, currentWeek, setVolume, bestSets } from "../utils/helpers";
 
 const MY_GYM=INITIAL_GYMS[0];
-const setVolume=s=>s.reduce((a,x)=>a+(parseFloat(x.weight)||0)*(parseInt(x.reps)||0),0);
 
-export default function WorkoutTab(){
+export default function WorkoutTab({user,updateUser}){
   const [muscleGroup,setMuscleGroup]=useState("Chest");
   const [selectedEx,setSelectedEx]=useState(null);
   const [sets,setSets]=useState({});
   const [checked,setChecked]=useState({});
-  const [logByDay,setLogByDay]=useState(SAMPLE_WEEK_LOG);
-  const [openDay,setOpenDay]=useState(null); // null = normal view; index = focused day
+  const [openDay,setOpenDay]=useState(null); // null = normal view; dateKey = focused day
   const [exIdx,setExIdx]=useState(0);
   const [view,setView]=useState("stats");
   const [exSearch,setExSearch]=useState("");
-  const [friendStatus,setFriendStatus]=useState({alex_lifts:"friends"});
   const [prPage,setPrPage]=useState(0);
   const [livePage,setLivePage]=useState(0);
   const carouselRef=useRef(null);
+  // Workouts are saved on the account, keyed by date ("2026-10-11" → exercises done that day).
+  const workouts=user.workouts;
+  const friendStatus=user.friends;
+  const todayKey=dateKey();
+  const week=currentWeek();
   const exercises=WORKOUTS[muscleGroup].filter(e=>!exSearch||e.toLowerCase().includes(exSearch.toLowerCase()));
   function getSets(ex){return sets[ex]||[{weight:"",reps:""},{weight:"",reps:""},{weight:"",reps:""}];}
   function updateSet(ex,i,f,v){setSets(prev=>{const s=[...(prev[ex]||[{weight:"",reps:""},{weight:"",reps:""},{weight:"",reps:""}])];s[i]={...s[i],[f]:v};return{...prev,[ex]:s};});}
@@ -29,43 +32,36 @@ export default function WorkoutTab(){
     if(!selectedEx)return;
     const s=getSets(selectedEx).filter(s=>s.weight&&s.reps).map(s=>({weight:parseFloat(s.weight),reps:parseInt(s.reps)}));
     if(!s.length)return;
-    setLogByDay(prev=>({...prev,[TODAY_IDX]:[...(prev[TODAY_IDX]||[]),{exercise:selectedEx,group:muscleGroup,sets:s}]}));
+    const entry={exercise:selectedEx,group:muscleGroup,sets:s,loggedAt:Date.now()};
+    updateUser(u=>({workouts:{...u.workouts,[todayKey]:[...(u.workouts[todayKey]||[]),entry]}}));
     setSets(prev=>{const n={...prev};delete n[selectedEx];return n;});
     setSelectedEx(null);
     setView("stats");
   }
-  function addFriend(username){setFriendStatus(prev=>({...prev,[username]:"requested"}));setTimeout(()=>setFriendStatus(prev=>({...prev,[username]:"friends"})),1500);}
-  function toggleDay(i){setOpenDay(prev=>prev===i?null:i);setExIdx(0);if(carouselRef.current)carouselRef.current.scrollLeft=0;}
+  function addFriend(username){
+    updateUser(u=>({friends:{...u.friends,[username]:"requested"}}));
+    // Prototype: simulates the other person accepting. Real friend requests need a backend.
+    setTimeout(()=>updateUser(u=>({friends:{...u.friends,[username]:"friends"}})),1500);
+  }
+  function toggleDay(key){setOpenDay(prev=>prev===key?null:key);setExIdx(0);if(carouselRef.current)carouselRef.current.scrollLeft=0;}
   function onCarouselScroll(e){const el=e.currentTarget;setExIdx(Math.round(el.scrollLeft/el.clientWidth));}
   function slide(dir){if(carouselRef.current)carouselRef.current.scrollBy({left:dir*carouselRef.current.clientWidth,behavior:"smooth"});}
 
-  const daysTrained=Object.values(logByDay).filter(d=>d&&d.length>0).length;
+  const daysTrained=week.filter(d=>(workouts[d.key]||[]).length>0).length;
 
   // Today's totals (normal view)
-  const todayLog=logByDay[TODAY_IDX]||[];
+  const todayLog=workouts[todayKey]||[];
   const todayVolume=todayLog.reduce((a,w)=>a+setVolume(w.sets),0);
   const todaySets=todayLog.reduce((a,w)=>a+w.sets.length,0);
 
   // Focused day
-  const focusLog=openDay!=null?(logByDay[openDay]||[]):[];
+  const focusLog=openDay?(workouts[openDay]||[]):[];
   const focusVolume=focusLog.reduce((a,w)=>a+setVolume(w.sets),0);
   const focusSets=focusLog.reduce((a,w)=>a+w.sets.length,0);
-  const focusLabel=openDay===TODAY_IDX?"Today":openDay!=null?WEEK_DAYS[openDay].label:"";
+  const focusLabel=openDay===todayKey?"Today":openDay?week.find(d=>d.key===openDay)?.label:"";
 
-  // Personal records — best set per exercise across the whole logged week, merged with base PRs
-  const weekBests={};
-  Object.values(logByDay).forEach(day=>(day||[]).forEach(w=>{
-    const best=w.sets.reduce((b,s)=>((parseFloat(s.weight)||0)>b.weight?{weight:parseFloat(s.weight)||0,reps:parseInt(s.reps)||0}:b),{weight:0,reps:0});
-    if(!weekBests[w.exercise]||best.weight>weekBests[w.exercise].weight)weekBests[w.exercise]=best;
-  }));
-  const recordExercises=[...new Set([...Object.keys(PERSONAL_RECORDS),...Object.keys(weekBests)])];
-  const records=recordExercises.map(ex=>{
-    const base=PERSONAL_RECORDS[ex];
-    const wk=weekBests[ex];
-    const isNewPR=wk&&(!base||wk.weight>base.weight);
-    const best=isNewPR?wk:base;
-    return{exercise:ex,weight:best.weight,reps:best.reps,date:isNewPR?"This week":base?.date||"—",isNewPR};
-  }).sort((a,b)=>b.weight-a.weight);
+  // Personal records — heaviest set per exercise across everything the user has logged
+  const records=Object.entries(bestSets(workouts)).map(([exercise,b])=>({exercise,weight:b.weight,reps:b.reps,date:b.dateKey===todayKey?"Today":shortDate(b.dateKey),isNewPR:b.dateKey===todayKey})).sort((a,b)=>b.weight-a.weight);
   const PR_PAGE_SIZE=5;
   const prPageCount=Math.max(1,Math.ceil(records.length/PR_PAGE_SIZE));
   const clampedPrPage=Math.min(prPage,prPageCount-1);
@@ -86,13 +82,13 @@ export default function WorkoutTab(){
           <div className="card">
             <div className="card-title">This Week — tap a day</div>
             <div className="week-scroll">
-              {WEEK_DAYS.map((d,i)=>{
-                const has=(logByDay[i]||[]).length>0;
+              {week.map(d=>{
+                const has=(workouts[d.key]||[]).length>0;
                 return(
-                  <button key={i} className={`day-pill ${openDay===i?"sel":""}`} onClick={()=>toggleDay(i)}>
+                  <button key={d.key} className={`day-pill ${openDay===d.key?"sel":""}`} onClick={()=>toggleDay(d.key)}>
                     <span className="day-pill-dow">{d.short}</span>
                     <span className="day-pill-date">{d.date}</span>
-                    <span className={`day-pill-dot ${has?"has":""} ${i===TODAY_IDX?"today":""}`}/>
+                    <span className={`day-pill-dot ${has?"has":""} ${d.key===todayKey?"today":""}`}/>
                   </button>
                 );
               })}
@@ -170,6 +166,7 @@ export default function WorkoutTab(){
                     </div>
                   )}
                 </div>
+                {records.length===0&&<div style={{color:"var(--muted)",fontSize:13,padding:"6px 0"}}>No records yet — log a workout and your best lift on each exercise shows up here.</div>}
                 {pagedRecords.map(r=>(
                   <div key={r.exercise} className="food-item">
                     <div><div className="food-name">{r.exercise}</div><div className="food-amount">{r.date}</div></div>

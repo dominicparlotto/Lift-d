@@ -1,18 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./styles.css";
 import AuthScreen from "./components/AuthScreen";
 import NutritionTab from "./components/NutritionTab";
 import SocialTab from "./components/SocialTab";
 import WorkoutTab from "./components/WorkoutTab";
 import ProfileTab from "./components/ProfileTab";
+import { loadAccounts, saveAccounts, loadSession, saveSession, EMPTY_DATA } from "./utils/accounts";
 
 export default function App(){
-  const [user,setUser]=useState(null);
+  const [accounts,setAccounts]=useState(loadAccounts);
+  const [sessionId,setSessionId]=useState(loadSession);
   const [tab,setTab]=useState("nutrition");
-  const [savedClips,setSavedClips]=useState([]);
-  function toggleSaveClip(id){setSavedClips(prev=>prev.includes(id)?prev.filter(c=>c!==id):[...prev,id]);}
+  useEffect(()=>{saveAccounts(accounts);},[accounts]);
+  useEffect(()=>{saveSession(sessionId);},[sessionId]);
 
-  if(!user)return(<div style={{maxWidth:430,margin:"0 auto",height:"100vh",overflow:"auto",background:"var(--bg)"}}><AuthScreen onAuth={u=>setUser(u)}/></div>);
+  const user=sessionId&&accounts[sessionId]?{...EMPTY_DATA,...accounts[sessionId]}:null;
+  // Merge a patch (an object, or a function of the current account) into the signed-in account.
+  function updateUser(patch){
+    setAccounts(prev=>{
+      const cur=prev[sessionId];
+      if(!cur)return prev;
+      const p=typeof patch==="function"?patch({...EMPTY_DATA,...cur}):patch;
+      return{...prev,[sessionId]:{...cur,...p}};
+    });
+  }
+  function signOut(){setSessionId(null);setTab("nutrition");}
+
+  if(!user)return(<div style={{maxWidth:430,margin:"0 auto",height:"100vh",overflow:"auto",background:"var(--bg)"}}><AuthScreen accounts={accounts} onCreateAccount={a=>{setAccounts(prev=>({...prev,[a.id]:a}));setSessionId(a.id);}} onSignIn={setSessionId}/></div>);
+
+  // The feed is every account's posts on this device, newest first.
+  const posts=Object.values(accounts).flatMap(a=>(a.posts||[]).map(p=>({...p,author:a}))).sort((x,y)=>y.createdAt-x.createdAt);
 
   const tabs=[
     {id:"nutrition",label:"Nutrition",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/><path d="M12 8v4l3 3"/></svg>},
@@ -25,10 +42,10 @@ export default function App(){
     <div className="app">
       <div className="glow-top"/><div className="glow-bottom"/>
       <div className="content">
-        {tab==="nutrition"&&<NutritionTab/>}
-        {tab==="social"&&<SocialTab user={user} savedClips={savedClips} onSaveClip={toggleSaveClip}/>}
-        {tab==="workout"&&<WorkoutTab/>}
-        {tab==="profile"&&<ProfileTab user={user} onSignOut={()=>setUser(null)} savedClips={savedClips}/>}
+        {tab==="nutrition"&&<NutritionTab user={user} updateUser={updateUser} onOpenProfile={()=>setTab("profile")}/>}
+        {tab==="social"&&<SocialTab user={user} posts={posts} updateUser={updateUser}/>}
+        {tab==="workout"&&<WorkoutTab user={user} updateUser={updateUser}/>}
+        {tab==="profile"&&<ProfileTab user={user} accounts={accounts} updateUser={updateUser} onSignOut={signOut}/>}
       </div>
       <nav className="nav">{tabs.map(t=><button key={t.id} className={`nav-btn ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}>{t.icon}{t.label}<div className="nav-bar"/></button>)}</nav>
     </div>

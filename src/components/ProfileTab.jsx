@@ -1,75 +1,186 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { BADGES } from "../data/badges";
-import { CLIP_POSTS, MY_POSTS, PR_ANNOUNCEMENTS } from "../data/social";
+import { CLIP_POSTS, SKILL_TAGS } from "../data/social";
+import { PASSWORD_RULES, validateUsername, isUsernameTaken, hashPassword, newSalt } from "../utils/accounts";
+import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
 
-export default function ProfileTab({user,onSignOut,savedClips}){
+const avatarImg={width:"100%",height:"100%",borderRadius:"50%",objectFit:"cover",display:"block"};
+const fieldLabel={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted)",marginBottom:6};
+const chevron=<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>;
+
+export default function ProfileTab({user,accounts,updateUser,onSignOut}){
   const [tab,setTab]=useState("posts");
   const [notifs,setNotifs]=useState(true);
   const [priv,setPriv]=useState(false);
   const [dark,setDark]=useState(true);
   const [units,setUnits]=useState("imperial");
   const [sharedPR,setSharedPR]=useState({});
-  const [boostCounts,setBoostCounts]=useState({pr1:12,pr2:8,pr3:24});
-  const initials=(user?.name||"JD").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-  const skillTag=user?.skill||"Powerlifter";
+  const [showEdit,setShowEdit]=useState(false);
+  const [showPassword,setShowPassword]=useState(false);
+
+  // Everything below is derived from what the user has actually logged — a new account shows zeros.
+  const stats=trainingStats(user.workouts);
+  const weekDays=currentWeek().filter(d=>(user.workouts[d.key]||[]).length>0).length;
+  const followers=Object.values(accounts).filter(a=>a.id!==user.id&&(a.following||[]).includes(user.id)).length;
+  const badgeStats={...stats,weekDays,accountAgeDays:(Date.now()-user.createdAt)/86400000};
+  const todayKey=dateKey();
+  const prs=Object.entries(bestSets(user.workouts)).map(([exercise,b])=>({exercise,...b})).sort((a,b)=>b.weight-a.weight);
+
+  function sharePR(pr){
+    updateUser(u=>({posts:[{id:crypto.randomUUID(),content:`🏆 New PR: ${pr.exercise} — ${pr.weight} lbs × ${pr.reps}`,hasVideo:false,createdAt:Date.now(),muscle:"All",skill:"All",equipment:"All"},...u.posts]}));
+    setSharedPR(p=>({...p,[pr.exercise]:true}));
+  }
+
   return(
     <div>
-      <div className="profile-banner"><div className="profile-avatar-wrap"><div className="profile-avatar-ring"><div className="profile-avatar-inner">{initials}</div></div></div><div className="profile-actions-top"><button className="btn-outline btn-sm">Edit Profile</button></div></div>
+      <div className="profile-banner"><div className="profile-avatar-wrap"><div className="profile-avatar-ring"><div className="profile-avatar-inner">{user.avatar?<img src={user.avatar} alt="" style={avatarImg}/>:initials(user.name)}</div></div></div><div className="profile-actions-top"><button className="btn-outline btn-sm" onClick={()=>setShowEdit(true)}>Edit Profile</button></div></div>
       <div className="profile-info">
-        <div className="profile-name">{user?.name||"Jordan Davis"}</div>
-        <div className="profile-handle">@{user?.username||"jordandavis_lifts"}<span style={{marginLeft:8,background:"linear-gradient(135deg,#f59e0b,#ef4444)",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:800,color:"#fff",verticalAlign:"middle"}}>✓ COACH</span></div>
-        <div className="profile-bio">Powerlifter & nutrition nerd 🏋️‍♂️ | Athens, GA | Chasing PRs one rep at a time</div>
-        <div className="skill-tags"><span className="skill-tag">{skillTag}</span><span className="skill-tag">Barbell</span><span className="skill-tag">Strength</span></div>
-        <div className="profile-meta"><div className="profile-meta-item">📍 <span>Athens, GA</span></div><div className="profile-meta-item">🔥 <span>4-Day Streak</span></div></div>
+        <div className="profile-name">{user.name}</div>
+        <div className="profile-handle">@{user.username}</div>
+        {user.bio?<div className="profile-bio">{user.bio}</div>:<button onClick={()=>setShowEdit(true)} style={{background:"none",border:"none",padding:0,marginTop:8,color:"var(--accent)",font:"600 13px var(--font)",cursor:"pointer"}}>+ Add a bio</button>}
+        {user.skill&&<div className="skill-tags"><span className="skill-tag">{user.skill}</span></div>}
+        {(user.location||weekDays>0)&&<div className="profile-meta">{user.location&&<div className="profile-meta-item">📍 <span>{user.location}</span></div>}{weekDays>0&&<div className="profile-meta-item">🔥 <span>{weekDays}-Day Streak</span></div>}</div>}
       </div>
-      <div className="profile-stats"><div className="profile-stat"><div className="profile-stat-val">148</div><div className="profile-stat-lbl">Workouts</div></div><div className="profile-stat"><div className="profile-stat-val">312</div><div className="profile-stat-lbl">Followers</div></div><div className="profile-stat"><div className="profile-stat-val">189</div><div className="profile-stat-lbl">Following</div></div><div className="profile-stat"><div className="profile-stat-val">3</div><div className="profile-stat-lbl">PRs</div></div></div>
+      <div className="profile-stats"><div className="profile-stat"><div className="profile-stat-val">{stats.daysTrained}</div><div className="profile-stat-lbl">Workouts</div></div><div className="profile-stat"><div className="profile-stat-val">{followers}</div><div className="profile-stat-lbl">Followers</div></div><div className="profile-stat"><div className="profile-stat-val">{user.following.length}</div><div className="profile-stat-lbl">Following</div></div><div className="profile-stat"><div className="profile-stat-val">{stats.prCount}</div><div className="profile-stat-lbl">PRs</div></div></div>
       <div className="profile-tabs">{[["posts","Posts"],["prs","PRs"],["badges","Badges"],["saved","Saved"],["settings","Settings"]].map(([id,lbl])=><button key={id} className={`profile-tab ${tab===id?"active":""}`} onClick={()=>setTab(id)}>{lbl}</button>)}</div>
 
-      {tab==="posts"&&(<div><div className="posts-grid">{MY_POSTS.map(post=><div key={post.id} className="post-tile"><div style={{position:"absolute",inset:0,background:"radial-gradient(circle,var(--accent) 0%,var(--accent2) 100%)",opacity:0.12}}/><div className="post-tile-emoji">{post.emoji}</div><div className="post-tile-meta"><div className="post-tile-likes"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>{post.likes}</div></div></div>)}</div>{MY_POSTS.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.emoji}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><div style={{display:"flex",gap:14}}><span style={{fontSize:11,color:"var(--muted)"}}>{post.time}</span><span style={{fontSize:11,color:"var(--muted)"}}>❤️ {post.likes}</span><span style={{fontSize:11,color:"var(--muted)"}}>💬 {post.comments}</span></div></div></div></div>)}<div style={{height:24}}/></div>)}
+      {tab==="posts"&&(<div>
+        {user.posts.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>📝</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12}}>Share a workout from the Feed tab and it'll show up here.</div></div>}
+        {user.posts.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.hasVideo?"🎥":"📝"}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><span style={{fontSize:11,color:"var(--muted)"}}>{timeAgo(post.createdAt)}</span></div></div></div>)}
+        <div style={{height:24}}/>
+      </div>)}
 
       {tab==="prs"&&(<div style={{padding:"12px 0"}}>
-        <div style={{padding:"0 16px 12px",fontSize:13,color:"var(--muted)"}}>Your PRs are auto-shared as cards. Tap Share to post to your feed.</div>
-        {PR_ANNOUNCEMENTS.map(pr=>(
-          <div key={pr.id} className="pr-card">
-            <div className="pr-title">🏆 NEW PERSONAL RECORD</div>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:36}}>{pr.emoji}</div>
-              <div>
-                <div className="pr-exercise">{pr.exercise}</div>
-                <div className="pr-weight">{pr.weight}<span style={{fontSize:20,fontWeight:600}}> {pr.unit}</span></div>
-                <div className="pr-delta">↑ {pr.weight-pr.prev}{pr.unit} from previous · {pr.date}</div>
-              </div>
+        {prs.length===0?(
+          <div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🏆</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No PRs yet</div><div style={{fontSize:12}}>Log a workout and your best lift on each exercise shows up here.</div></div>
+        ):(<>
+          <div style={{padding:"0 16px 12px",fontSize:13,color:"var(--muted)"}}>Your heaviest set on each lift. Tap Share to post it to your feed.</div>
+          {prs.map(pr=>(
+            <div key={pr.exercise} className="pr-card">
+              <div className="pr-title">🏆 PERSONAL RECORD</div>
+              <div className="pr-exercise">{pr.exercise}</div>
+              <div className="pr-weight">{pr.weight}<span style={{fontSize:20,fontWeight:600}}> lbs</span> <span style={{fontSize:16,fontWeight:600,color:"var(--muted)"}}>× {pr.reps}</span></div>
+              <div className="pr-delta">{pr.dateKey===todayKey?"Today":shortDate(pr.dateKey)}</div>
+              <div style={{marginTop:14}}><button className="pr-share-btn" disabled={sharedPR[pr.exercise]} onClick={()=>sharePR(pr)}>{sharedPR[pr.exercise]?"✓ Shared!":"📤 Share to Feed"}</button></div>
             </div>
-            <div style={{display:"flex",gap:8,marginTop:14,alignItems:"center"}}>
-              <button style={{background:"rgba(255,140,0,0.15)",border:"1px solid rgba(255,140,0,0.3)",borderRadius:10,padding:"6px 14px",color:"#FF8C00",fontSize:12,fontWeight:700,fontFamily:"var(--font)",cursor:"pointer"}} onClick={()=>setBoostCounts(p=>({...p,[pr.id]:(p[pr.id]||0)+1}))}>⚡ Boost {boostCounts[pr.id]||0}</button>
-              <button className="pr-share-btn" onClick={()=>setSharedPR(p=>({...p,[pr.id]:true}))}>{sharedPR[pr.id]?"✓ Shared!":"📤 Share Card"}</button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </>)}
       </div>)}
 
       {tab==="badges"&&(<div style={{padding:"16px 16px 24px"}}>
         <div style={{fontSize:13,color:"var(--muted)",marginBottom:14}}>Earn badges by hitting milestones. Earned badges show on your profile.</div>
-        <div className="badge-grid">{BADGES.map(b=><div key={b.id} className={`badge-card ${b.earned?"earned":"locked"}`}><div className="badge-icon">{b.earned?b.icon:"🔒"}</div><div><div className="badge-name">{b.name}</div><div className="badge-desc">{b.desc}</div>{b.earned&&<div style={{fontSize:10,color:"var(--accent3)",fontWeight:600,marginTop:4}}>✓ Earned</div>}</div></div>)}</div>
+        <div className="badge-grid">{BADGES.map(b=>{const earned=b.test(badgeStats);return<div key={b.id} className={`badge-card ${earned?"earned":"locked"}`}><div className="badge-icon">{earned?b.icon:"🔒"}</div><div><div className="badge-name">{b.name}</div><div className="badge-desc">{b.desc}</div>{earned&&<div style={{fontSize:10,color:"var(--accent3)",fontWeight:600,marginTop:4}}>✓ Earned</div>}</div></div>;})}</div>
       </div>)}
 
       {tab==="saved"&&(<div style={{padding:"12px 0 24px"}}>
         <div style={{padding:"0 16px 10px",fontSize:13,color:"var(--muted)"}}>Tutorials and clips you've bookmarked for reference at the gym.</div>
-        {savedClips.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🔖</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No saved content yet</div><div style={{fontSize:12}}>Tap the bookmark icon on any clip or post to save it here.</div></div>}
-        {savedClips.map((cid,i)=>{const clip=CLIP_POSTS.find(c=>c.id===cid);if(!clip)return null;return(
-          <div key={i} className="saved-item"><div className="saved-thumb" style={{background:`linear-gradient(135deg,${clip.color}44,${clip.color}22)`}}>{clip.emoji}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{clip.content}</div><div style={{fontSize:12,color:"var(--muted)"}}>@{clip.user} · {clip.muscle}</div></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        {user.savedClips.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🔖</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No saved content yet</div><div style={{fontSize:12}}>Tap the bookmark icon on any clip to save it here.</div></div>}
+        {user.savedClips.map(cid=>{const clip=CLIP_POSTS.find(c=>c.id===cid);if(!clip)return null;return(
+          <div key={cid} className="saved-item"><div className="saved-thumb" style={{background:`linear-gradient(135deg,${clip.color}44,${clip.color}22)`}}>{clip.emoji}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{clip.content}</div><div style={{fontSize:12,color:"var(--muted)"}}>@{clip.user} · {clip.muscle}</div></div>{chevron}</div>
         );})}
       </div>)}
 
       {tab==="settings"&&(<div style={{paddingTop:16}}>
-        <div className="settings-section"><div className="settings-section-label">Account</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>👤</div><div><div className="settings-label">Edit Profile</div><div className="settings-sub">Name, bio, skill tags</div></div></div><div className="settings-right"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div></div><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔒</div><div><div className="settings-label">Change Password</div></div></div><div className="settings-right"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div></div><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🔗</div><div><div className="settings-label">Connected Apps</div><div className="settings-sub">Apple Health, Strava</div></div></div><div className="settings-right"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div></div></div></div>
-        <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div></div></div><label className="toggle"><input type="checkbox" checked={priv} onChange={e=>setPriv(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Account</div><div className="settings-list">
+          <div className="settings-row" onClick={()=>setShowEdit(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>👤</div><div><div className="settings-label">Edit Profile</div><div className="settings-sub">Photo, name, username, bio</div></div></div><div className="settings-right">{chevron}</div></div>
+          <div className="settings-row" onClick={()=>setShowPassword(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔒</div><div><div className="settings-label">Change Password</div></div></div><div className="settings-right">{chevron}</div></div>
+          <div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🔗</div><div><div className="settings-label">Connected Apps</div><div className="settings-sub">Apple Health, Strava</div></div></div><div className="settings-right">{chevron}</div></div>
+        </div></div>
+        <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div></div></div><label className="toggle"><input type="checkbox" checked={priv} onChange={e=>setPriv(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Notifications</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔔</div><div><div className="settings-label">Push Notifications</div></div></div><label className="toggle"><input type="checkbox" checked={notifs} onChange={e=>setNotifs(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div></div></div>
-        <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>setDark(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg></div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>setDark(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span>{chevron}</div></div></div></div>
         <div style={{padding:"0 16px 12px"}}><button className="btn-outline" style={{width:"100%",padding:"13px",marginBottom:10}} onClick={onSignOut}>Sign Out</button></div>
         <div style={{padding:"0 16px 32px"}}><button className="btn-danger">Delete Account</button></div>
       </div>)}
+
+      {showEdit&&<EditProfileModal user={user} accounts={accounts} onClose={()=>setShowEdit(false)} onSave={p=>{updateUser(p);setShowEdit(false);}}/>}
+      {showPassword&&<ChangePasswordModal user={user} onClose={()=>setShowPassword(false)} onSave={updateUser}/>}
     </div>
   );
 }
 
+function EditProfileModal({user,accounts,onSave,onClose}){
+  const [form,setForm]=useState({name:user.name,username:user.username,bio:user.bio,location:user.location,skill:user.skill||"",avatar:user.avatar});
+  const [err,setErr]=useState("");
+  const fileRef=useRef();
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const uname=form.username.trim();
+  const unameChanged=uname.toLowerCase()!==user.username.toLowerCase();
+  const unameError=unameChanged?validateUsername(uname)||(isUsernameTaken(accounts,uname,user.id)?"That username is already taken.":""):"";
+
+  async function pickPhoto(e){
+    const f=e.target.files[0];e.target.value="";
+    if(!f)return;
+    if(!f.type.startsWith("image/")){setErr("Please choose an image file.");return;}
+    try{set("avatar",await squareImageDataUrl(f));setErr("");}catch{setErr("Couldn't read that image — try a different one.");}
+  }
+  function save(){
+    if(!form.name.trim()){setErr("Name is required.");return;}
+    if(unameError){setErr(unameError);return;}
+    onSave({name:form.name.trim(),username:uname,bio:form.bio.trim(),location:form.location.trim(),skill:form.skill,avatar:form.avatar});
+  }
+
+  return(
+    <div className="modal-overlay" onClick={onClose}><div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+      <div className="modal-handle"/><div className="modal-title">Edit Profile</div>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,margin:"10px 0 18px"}}>
+        <div className="profile-avatar-ring" style={{width:88,height:88}}><div className="profile-avatar-inner" style={{fontSize:26}}>{form.avatar?<img src={form.avatar} alt="" style={avatarImg}/>:initials(form.name)}</div></div>
+        <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={pickPhoto}/>
+        <div style={{display:"flex",gap:8}}><button className="btn-outline btn-sm" onClick={()=>fileRef.current.click()}>{form.avatar?"Change photo":"Add photo"}</button>{form.avatar&&<button className="btn-outline btn-sm" onClick={()=>set("avatar",null)}>Remove</button>}</div>
+      </div>
+      {err&&<div className="auth-error" style={{marginBottom:12}}>{err}</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:20}}>
+        <div><div style={fieldLabel}>Name</div><input className="input-field" style={{width:"100%"}} value={form.name} onChange={e=>set("name",e.target.value)}/></div>
+        <div><div style={fieldLabel}>Username</div><input className="input-field" style={{width:"100%"}} value={form.username} onChange={e=>set("username",e.target.value)}/>
+          {unameChanged&&uname&&<div style={{fontSize:12,fontWeight:600,marginTop:6,color:unameError?"#FF7A6E":"var(--accent3)"}}>{unameError?`✕ ${unameError}`:"✓ Username is available"}</div>}</div>
+        <div><div style={{...fieldLabel,display:"flex",justifyContent:"space-between"}}><span>Bio</span><span style={{letterSpacing:0}}>{form.bio.length}/150</span></div><textarea className="input-field" maxLength={150} placeholder="Tell people about your training…" value={form.bio} onChange={e=>set("bio",e.target.value)} style={{width:"100%",minHeight:72,resize:"none"}}/></div>
+        <div><div style={fieldLabel}>Location</div><input className="input-field" style={{width:"100%"}} placeholder="e.g. Athens, GA" value={form.location} onChange={e=>set("location",e.target.value)}/></div>
+        <div><div style={fieldLabel}>Experience level</div><select className="input-field" style={{width:"100%",cursor:"pointer"}} value={form.skill} onChange={e=>set("skill",e.target.value)}>{SKILL_TAGS.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+      </div>
+      <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button><button className="btn" style={{flex:1}} onClick={save}>Save</button></div>
+    </div></div>
+  );
+}
+
+function ChangePasswordModal({user,onSave,onClose}){
+  const [cur,setCur]=useState(""); const [next,setNext]=useState(""); const [confirm,setConfirm]=useState("");
+  const [err,setErr]=useState(""); const [busy,setBusy]=useState(false); const [done,setDone]=useState(false);
+
+  async function submit(){
+    if(!cur||!next||!confirm){setErr("Fill in all fields.");return;}
+    setBusy(true);setErr("");
+    if(await hashPassword(cur,user.salt)!==user.passwordHash){setBusy(false);setErr("Current password is incorrect.");return;}
+    if(!PASSWORD_RULES.every(r=>r.test(next))){setBusy(false);setErr("New password doesn't meet all the requirements.");return;}
+    if(next===cur){setBusy(false);setErr("New password must be different from your current one.");return;}
+    if(next!==confirm){setBusy(false);setErr("New passwords don't match.");return;}
+    const salt=newSalt();
+    onSave({salt,passwordHash:await hashPassword(next,salt)});
+    setBusy(false);setDone(true);
+  }
+
+  return(
+    <div className="modal-overlay" onClick={onClose}><div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+      <div className="modal-handle"/>
+      {done?(
+        <div style={{textAlign:"center",padding:"10px 0 4px"}}>
+          <div style={{fontSize:40,marginBottom:10}}>✅</div>
+          <div className="modal-title">Password updated</div>
+          <div className="modal-sub">Use your new password the next time you sign in.</div>
+          <button className="btn" style={{width:"100%"}} onClick={onClose}>Done</button>
+        </div>
+      ):(<>
+        <div className="modal-title">Change Password</div>
+        <div className="modal-sub">Enter your current password, then choose a new one.</div>
+        {err&&<div className="auth-error" style={{marginBottom:12}}>{err}</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:20}}>
+          <div><div style={fieldLabel}>Current password</div><input className="input-field" type="password" style={{width:"100%"}} value={cur} onChange={e=>setCur(e.target.value)}/></div>
+          <div><div style={fieldLabel}>New password</div><input className="input-field" type="password" style={{width:"100%"}} value={next} onChange={e=>setNext(e.target.value)}/>
+            {next&&<div style={{marginTop:8,display:"flex",flexDirection:"column",gap:4}}>{PASSWORD_RULES.map(r=>{const ok=r.test(next);return<div key={r.label} style={{fontSize:12,fontWeight:600,color:ok?"var(--accent3)":"var(--muted)"}}>{ok?"✓":"○"} {r.label}</div>;})}</div>}</div>
+          <div><div style={fieldLabel}>Confirm new password</div><input className="input-field" type="password" style={{width:"100%"}} value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+            {confirm&&next!==confirm&&<div style={{fontSize:12,fontWeight:600,marginTop:6,color:"#FF7A6E"}}>✕ Passwords don't match</div>}</div>
+        </div>
+        <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button><button className="btn" style={{flex:1}} onClick={submit} disabled={busy}>{busy?"Updating…":"Update Password"}</button></div>
+      </>)}
+    </div></div>
+  );
+}
