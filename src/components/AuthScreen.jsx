@@ -2,8 +2,12 @@ import { useState } from "react";
 import { SKILL_TAGS } from "../data/social";
 import { PASSWORD_RULES, validateUsername, isUsernameTaken, isEmailTaken, findAccount, hashPassword, newSalt, newAccount } from "../utils/accounts";
 
+// Logo mark lives at the site root (public/favicon.svg); the app is served from /app/, so it's one level up.
+const LOGO="../favicon.svg";
+
 export default function AuthScreen({accounts,onCreateAccount,onSignIn}){
-  const [mode,setMode]=useState("splash");
+  // The homepage links to app/#signup and app/#signin to open the right screen directly.
+  const [mode,setMode]=useState(()=>({"#signup":"signup","#signin":"signin"})[window.location.hash]||"splash");
   const [email,setEmail]=useState(""); const [pass,setPass]=useState("");
   const [name,setName]=useState(""); const [username,setUsername]=useState("");
   const [skill,setSkill]=useState("");
@@ -43,9 +47,9 @@ export default function AuthScreen({accounts,onCreateAccount,onSignIn}){
     <div className="auth-screen"><div className="auth-glow-1"/><div className="auth-glow-2"/>
       <div className="auth-body" style={{justifyContent:"center"}}>
         <div className="auth-logo-wrap" style={{paddingTop:0}}>
-          <div className="auth-logo-icon">🏋️</div>
+          <img className="auth-logo-mark" src={LOGO} alt="Lift'd logo"/>
           <div className="auth-logo-name">Lift'd</div>
-          <div className="auth-logo-tag">Your fitness. Your community.</div>
+          <div className="auth-logo-tag">Lift together</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <button className="auth-btn" onClick={()=>setMode("signup")}>Create New Account</button>
@@ -64,7 +68,7 @@ export default function AuthScreen({accounts,onCreateAccount,onSignIn}){
   if(mode==="signin")return(
     <div className="auth-screen"><div className="auth-glow-1"/><div className="auth-glow-2"/>
       <div className="auth-body">
-        <div className="auth-logo-wrap" style={{paddingTop:44,paddingBottom:24}}><div className="auth-logo-icon">🏋️</div><div className="auth-logo-name">Lift'd</div></div>
+        <div className="auth-logo-wrap" style={{paddingTop:44,paddingBottom:24}}><img className="auth-logo-mark" src={LOGO} alt="Lift'd logo"/><div className="auth-logo-name">Lift'd</div></div>
         <div className="auth-form">{err&&<div className="auth-error">{err}</div>}
           <input className="auth-input" placeholder="Email or username" value={email} onChange={e=>setEmail(e.target.value)}/>
           <input className="auth-input" type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)}/>
@@ -78,7 +82,7 @@ export default function AuthScreen({accounts,onCreateAccount,onSignIn}){
   if(mode==="signup")return(
     <div className="auth-screen"><div className="auth-glow-1"/><div className="auth-glow-2"/>
       <div className="auth-body">
-        <div className="auth-logo-wrap" style={{paddingTop:32,paddingBottom:20}}><div className="auth-logo-icon">🏋️</div><div style={{fontSize:22,fontWeight:800,letterSpacing:"-0.5px",textAlign:"center"}}>Create Account</div><div style={{fontSize:13,color:"var(--muted)",marginTop:4}}>Join thousands of athletes today.</div></div>
+        <div className="auth-logo-wrap" style={{paddingTop:32,paddingBottom:20}}><img className="auth-logo-mark" src={LOGO} alt="Lift'd logo"/><div style={{fontSize:22,fontWeight:800,letterSpacing:"-0.5px",textAlign:"center"}}>Create Account</div><div style={{fontSize:13,color:"var(--muted)",marginTop:4}}>Free — start tracking in under a minute.</div></div>
         <div className="auth-form">{err&&<div className="auth-error">{err}</div>}
           <input className="auth-input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)}/>
           <input className="auth-input" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)}/>

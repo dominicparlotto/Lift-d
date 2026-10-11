@@ -3,10 +3,288 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lift'd — Your fitness. Your community.</title>
+    <title>Lift'd — Free Workout Tracker &amp; Gym Community App</title>
+    <meta name="description" content="Lift'd is a free gym app: log workouts and PRs, track macros, learn proper form from short clips, and find workout partners who train at your gym." />
+    <link rel="canonical" href="https://dominicparlotto.github.io/Lift-d/" />
+    <meta name="theme-color" content="#080C18" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Link previews (iMessage, Discord, X, Facebook, etc.) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Lift'd" />
+    <meta property="og:title" content="Lift'd — Free Workout Tracker & Gym Community App" />
+    <meta property="og:description" content="Log workouts and PRs, track macros, learn proper form, and find workout partners at your gym." />
+    <meta property="og:url" content="https://dominicparlotto.github.io/Lift-d/" />
+    <meta property="og:image" content="https://dominicparlotto.github.io/Lift-d/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Lift'd — Track every lift. Find your gym crew." />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Structured data: tells Google the site name and that this is a free fitness web app -->
+    <script type="application/ld+json">
+    [
+      {"@context":"https://schema.org","@type":"WebSite","name":"Lift'd","alternateName":"Liftd","url":"https://dominicparlotto.github.io/Lift-d/"},
+      {"@context":"https://schema.org","@type":"WebApplication","name":"Lift'd","url":"https://dominicparlotto.github.io/Lift-d/","applicationCategory":"HealthApplication","operatingSystem":"Any (web browser)","browserRequirements":"Requires JavaScript","description":"Free workout tracker and gym community: log sets and personal records, track macros, learn exercise form from short clips, and find workout partners at your gym.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+    ]
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root{--bg:#080C18;--bg2:#0D1225;--card:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.10);--text:#EEF2FF;--muted:rgba(238,242,255,0.68);--muted2:rgba(238,242,255,0.45);--accent:#4F8EF7;--accent2:#6C63FF;--accent3:#3ECFCF;--grad:linear-gradient(135deg,#4F8EF7,#6C63FF);}
+      *{box-sizing:border-box;margin:0;padding:0;}
+      html{scroll-behavior:smooth;}
+      body{background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+      a{color:inherit;}
+      .wrap{max-width:1120px;margin:0 auto;padding:0 24px;}
+      .glow{position:absolute;pointer-events:none;border-radius:50%;filter:blur(10px);}
+
+      /* Nav */
+      .nav{position:sticky;top:0;z-index:10;background:rgba(8,12,24,0.8);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
+      .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px;}
+      .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-size:20px;letter-spacing:-0.5px;}
+      .brand-mark{width:36px;height:36px;display:block;}
+      .nav-links{display:flex;align-items:center;gap:28px;font-size:15px;font-weight:500;}
+      .nav-links a{text-decoration:none;color:var(--muted);transition:color .15s;}
+      .nav-links a:hover{color:var(--text);}
+      .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 22px;border-radius:14px;font-weight:700;font-size:15px;text-decoration:none;transition:transform .15s,opacity .15s,background .15s;white-space:nowrap;}
+      .btn:hover{transform:translateY(-1px);}
+      .btn-primary{background:var(--grad);color:#fff;box-shadow:0 6px 24px rgba(79,142,247,0.35);}
+      .btn-ghost{background:var(--card);border:1px solid var(--border);color:var(--text);}
+      .btn-ghost:hover{background:rgba(255,255,255,0.09);}
+      .btn-sm{padding:9px 16px;font-size:14px;border-radius:11px;}
+
+      /* Hero */
+      .hero{position:relative;padding:88px 0 72px;overflow:hidden;}
+      .hero .wrap{display:grid;grid-template-columns:1.1fr 0.9fr;gap:56px;align-items:center;position:relative;}
+      .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:rgba(62,207,207,0.10);border:1px solid rgba(62,207,207,0.28);color:var(--accent3);font-size:13px;font-weight:700;margin-bottom:22px;}
+      h1{font-size:clamp(38px,5.6vw,62px);line-height:1.04;letter-spacing:-2px;font-weight:800;margin-bottom:22px;}
+      .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+      .lead{font-size:clamp(17px,1.6vw,19px);color:var(--muted);max-width:560px;margin-bottom:32px;}
+      .cta-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+      .fine{margin-top:16px;font-size:14px;color:var(--muted2);}
+
+      /* Phone mockup (illustrative UI) */
+      .phone{justify-self:center;width:min(320px,100%);border-radius:40px;padding:12px;background:linear-gradient(160deg,#1a2040,#0b0f20);border:1px solid rgba(255,255,255,0.12);box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(79,142,247,0.12),0 0 90px rgba(108,99,255,0.18);}
+      .screen{border-radius:30px;background:var(--bg);padding:22px 16px 18px;overflow:hidden;}
+      .s-title{font-size:20px;font-weight:800;letter-spacing:-0.5px;}
+      .s-sub{font-size:11px;color:var(--muted2);margin-bottom:14px;}
+      .s-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px;}
+      .s-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted2);margin-bottom:9px;}
+      .days{display:flex;gap:5px;}
+      .day{flex:1;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);text-align:center;padding:6px 0 5px;font-size:9px;font-weight:700;color:var(--muted2);}
+      .day b{display:block;font-size:13px;color:var(--text);}
+      .day i{display:block;width:4px;height:4px;border-radius:50%;margin:3px auto 0;background:transparent;}
+      .day.on i{background:var(--accent3);}
+      .day.sel{background:var(--grad);border-color:transparent;color:rgba(255,255,255,0.85);}
+      .day.sel i{background:#fff;}
+      .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px;}
+      .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px;}
+      .stat b{display:block;font-size:18px;font-weight:800;color:var(--accent);font-family:ui-monospace,Menlo,monospace;}
+      .stat span{font-size:8px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);}
+      .ex-name{font-size:14px;font-weight:800;margin-bottom:2px;}
+      .ex-meta{font-size:10px;color:var(--accent3);font-weight:600;margin-bottom:8px;}
+      .setl{display:flex;justify-content:space-between;font-size:11px;padding:6px 0;border-top:1px solid var(--border);}
+      .setl span{color:var(--muted2);font-weight:700;font-size:9px;letter-spacing:.5px;text-transform:uppercase;}
+      .setl b{font-weight:700;}
+      .pr{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(255,140,0,0.12),rgba(255,80,80,0.08));border:1px solid rgba(255,140,0,0.28);border-radius:14px;padding:10px 12px;}
+      .pr .t{font-size:9px;font-weight:800;letter-spacing:1px;color:#FF9F43;}
+      .pr .v{font-size:13px;font-weight:800;}
+
+      /* Sections */
+      section{padding:80px 0;position:relative;}
+      .section-head{max-width:640px;margin-bottom:44px;}
+      .kicker{font-size:13px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
+      h2{font-size:clamp(30px,3.6vw,42px);line-height:1.1;letter-spacing:-1.2px;font-weight:800;margin-bottom:14px;}
+      .section-head p{color:var(--muted);font-size:17px;}
+      .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;}
+      .feature{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:26px;transition:border-color .2s,transform .2s;}
+      .feature:hover{border-color:rgba(79,142,247,0.4);transform:translateY(-3px);}
+      .f-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:18px;background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);}
+      h3{font-size:19px;font-weight:700;letter-spacing:-0.3px;margin-bottom:8px;}
+      .feature p{color:var(--muted);font-size:15px;}
+      .feature ul{list-style:none;margin-top:14px;display:grid;gap:7px;}
+      .feature li{font-size:14px;color:var(--muted);padding-left:22px;position:relative;}
+      .feature li::before{content:"✓";position:absolute;left:0;color:var(--accent3);font-weight:800;}
+
+      .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;counter-reset:step;}
+      .step{padding:26px;border-radius:22px;border:1px dashed rgba(255,255,255,0.16);}
+      .step::before{counter-increment:step;content:counter(step);display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:var(--grad);font-weight:800;margin-bottom:16px;}
+      .step p{color:var(--muted);font-size:15px;}
+
+      .faq{max-width:780px;display:grid;gap:12px;}
+      details{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 22px;}
+      details[open]{border-color:rgba(79,142,247,0.35);}
+      summary{cursor:pointer;font-weight:700;font-size:17px;list-style:none;display:flex;justify-content:space-between;gap:16px;align-items:center;}
+      summary::-webkit-details-marker{display:none;}
+      summary::after{content:"+";font-size:22px;color:var(--accent);flex-shrink:0;transition:transform .2s;}
+      details[open] summary::after{transform:rotate(45deg);}
+      details p{color:var(--muted);margin-top:12px;font-size:15px;}
+
+      .cta-band{text-align:center;border-radius:28px;padding:56px 24px;background:radial-gradient(ellipse at 50% 0%,rgba(108,99,255,0.28),transparent 70%),var(--bg2);border:1px solid var(--border);}
+      .cta-band p{color:var(--muted);font-size:17px;max-width:520px;margin:0 auto 28px;}
+      .cta-band .cta-row{justify-content:center;}
+
+      footer{border-top:1px solid var(--border);padding:32px 0 40px;color:var(--muted2);font-size:14px;}
+      footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;}
+      footer nav{display:flex;gap:22px;}
+      footer a{text-decoration:none;}
+      footer a:hover{color:var(--text);}
+
+      a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px;}
+
+      @media (max-width:900px){
+        .hero{padding:56px 0 48px;}
+        .hero .wrap{grid-template-columns:1fr;gap:48px;}
+        .nav-links a:not(.btn){display:none;}
+        section{padding:60px 0;}
+      }
+      @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important;}}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <header class="nav">
+      <div class="wrap">
+        <a class="brand" href="./" aria-label="Lift'd home"><img class="brand-mark" src="/favicon.svg" alt="" width="36" height="36" />Lift'd</a>
+        <nav class="nav-links" aria-label="Main">
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#faq">FAQ</a>
+          <a class="btn btn-primary btn-sm" href="app/#signin">Open the app</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="glow" style="width:520px;height:520px;top:-180px;left:-160px;background:radial-gradient(circle,rgba(79,142,247,0.22),transparent 65%);"></div>
+        <div class="glow" style="width:460px;height:460px;bottom:-200px;right:-120px;background:radial-gradient(circle,rgba(108,99,255,0.2),transparent 65%);"></div>
+        <div class="wrap">
+          <div>
+            <div class="eyebrow">● Free · Works in your browser</div>
+            <h1 id="hero-title">Track every lift. Learn proper form. <span class="grad-text">Find your gym crew.</span></h1>
+            <p class="lead">Lift'd is a free workout tracker and gym community in one app. Log your sets and macros, learn exercise form from short coaching clips, and connect with people who train at your gym.</p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="app/#signup">Get started — it's free</a>
+              <a class="btn btn-ghost" href="app/#signin">Sign in</a>
+            </div>
+            <p class="fine">No download needed. Works on iPhone, Android, and desktop.</p>
+          </div>
+
+          <div class="phone" role="img" aria-label="Lift'd workout screen showing this week's training days, today's totals, and a logged bench press">
+            <div class="screen" aria-hidden="true">
+              <div class="s-title">Workout</div>
+              <div class="s-sub">Track your session</div>
+              <div class="s-card">
+                <div class="s-label">This week — tap a day</div>
+                <div class="days">
+                  <div class="day on">M<b>5</b><i></i></div><div class="day on">T<b>6</b><i></i></div><div class="day">W<b>7</b><i></i></div><div class="day on">T<b>8</b><i></i></div><div class="day sel">F<b>9</b><i></i></div><div class="day">S<b>10</b><i></i></div><div class="day">S<b>11</b><i></i></div>
+                </div>
+              </div>
+              <div class="stats">
+                <div class="stat"><b>4</b><span>Exercises</span></div>
+                <div class="stat"><b>12</b><span>Sets</span></div>
+                <div class="stat"><b>8.4k</b><span>Volume</span></div>
+              </div>
+              <div class="s-card">
+                <div class="s-label">Exercise 1 of 4 · Chest</div>
+                <div class="ex-name">Barbell Bench Press</div>
+                <div class="ex-meta">Top set 185 lbs · 3,515 lbs volume</div>
+                <div class="setl"><span>Set 1</span><b>135 lbs × 10</b></div>
+                <div class="setl"><span>Set 2</span><b>155 lbs × 8</b></div>
+                <div class="setl"><span>Set 3</span><b>185 lbs × 5</b></div>
+              </div>
+              <div class="pr"><div style="font-size:20px">🏆</div><div><div class="t">NEW PERSONAL RECORD</div><div class="v">Bench Press · 185 lbs × 5</div></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" aria-labelledby="features-title">
+        <div class="wrap">
+          <div class="section-head">
+            <div class="kicker">Features</div>
+            <h2 id="features-title">Everything you need at the gym, in one app</h2>
+            <p>Most fitness apps do one thing. Lift'd puts your workout log, nutrition, form tips, and gym friends in the same place.</p>
+          </div>
+          <div class="features">
+            <article class="feature">
+              <div class="f-icon">🏋️</div>
+              <h3>Workout tracker</h3>
+              <p>Log every set with weight and reps, then flip back through any day of the week to see exactly what you lifted.</p>
+              <ul><li>170+ exercises across 10 categories</li><li>Automatic personal records</li><li>Weekly streaks and badges</li></ul>
+            </article>
+            <article class="feature">
+              <div class="f-icon">🥗</div>
+              <h3>Macro &amp; calorie tracker</h3>
+              <p>Search 170+ foods, log by the gram, and see your calories, protein, carbs, and fat against your goal.</p>
+              <ul><li>Cut, maintain, or bulk targets</li><li>Add your own custom foods</li><li>Last-7-days calorie trend</li></ul>
+            </article>
+            <article class="feature">
+              <div class="f-icon">🎬</div>
+              <h3>Learn proper form</h3>
+              <p>Short-form clips with on-screen coaching cues, so you can check your technique between sets.</p>
+              <ul><li>Filter by muscle group and skill level</li><li>Save clips to watch at the gym</li><li>Built for beginners and experienced lifters</li></ul>
+            </article>
+            <article class="feature">
+              <div class="f-icon">👥</div>
+              <h3>Find workout partners</h3>
+              <p>Join your gym's community to chat, see who's training right now, and add friends to lift with.</p>
+              <ul><li>Gym group chats and channels</li><li>See who's at your gym now</li><li>Friends only connect when both add each other</li></ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="section-head">
+            <div class="kicker">How it works</div>
+            <h2 id="how-title">Start logging in under a minute</h2>
+          </div>
+          <div class="steps">
+            <div class="step"><h3>Create a free account</h3><p>Pick a username and your experience level. Your profile starts clean, and every stat on it comes from your own training.</p></div>
+            <div class="step"><h3>Log workouts and meals</h3><p>Finish your sets, tap save, and they're filed under today. Your PRs, streak, and badges update automatically.</p></div>
+            <div class="step"><h3>Join your gym's community</h3><p>Find your gym, hop in the chat, and add the people you train next to as friends.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" aria-labelledby="faq-title">
+        <div class="wrap">
+          <div class="section-head">
+            <div class="kicker">FAQ</div>
+            <h2 id="faq-title">Questions, answered</h2>
+          </div>
+          <div class="faq">
+            <details><summary>Is Lift'd free?</summary><p>Yes. Lift'd is free to use. Create an account and start logging workouts and meals right away.</p></details>
+            <details><summary>Do I need to download an app?</summary><p>No. Lift'd runs in your web browser on your phone or computer. On iPhone, open it in Safari and tap Share → Add to Home Screen to get an app icon. Native iPhone and Android apps are planned.</p></details>
+            <details><summary>Is Lift'd good for beginners?</summary><p>Yes. You choose your experience level when you sign up, the exercise library covers every major muscle group, and form clips can be filtered to beginner level.</p></details>
+            <details><summary>How does finding workout partners work?</summary><p>Join your gym's community to chat with other members and see who's training right now. You can add people as friends, and you're only connected once they add you back.</p></details>
+            <details><summary>Where is my data saved?</summary><p>For now, your account and history are saved in the browser on the device you sign up with, and your password is stored as a secure hash, never as plain text. Syncing across devices is coming soon.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="cta-title">
+        <div class="wrap">
+          <div class="cta-band">
+            <h2 id="cta-title">Your next PR starts here</h2>
+            <p>Track your training, dial in your nutrition, and meet the people you lift with.</p>
+            <div class="cta-row"><a class="btn btn-primary" href="app/#signup">Create your free account</a><a class="btn btn-ghost" href="app/#signin">Sign in</a></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div>© 2026 Lift'd</div>
+        <nav aria-label="Footer"><a href="#features">Features</a><a href="#faq">FAQ</a><a href="app/#signin">Open the app</a></nav>
+      </div>
+    </footer>
   </body>
 </html>

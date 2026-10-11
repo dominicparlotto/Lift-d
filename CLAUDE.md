@@ -10,6 +10,9 @@ A mobile-style fitness app (React + Vite) with four tabs: Nutrition, Feed (socia
 - Styling is a single global stylesheet (`src/styles.css`), plain CSS custom properties (dark theme), no CSS framework
 
 ## Structure
+- `index.html` — public homepage: static HTML/CSS (no React) so search engines can read it; holds the SEO meta tags + structured data. Links into the app via `app/#signup` / `app/#signin`.
+- `app/index.html` — the React app entry (marked `noindex`). Vite builds both pages (`build.rollupOptions.input` in `vite.config.js`); `base: "./"` keeps paths working on GitHub Pages at `/Lift-d/`.
+- `public/` — favicon, apple-touch-icon, link-preview image (`og-image.jpg`), `sitemap.xml`. Absolute URLs in `index.html` + `sitemap.xml` point at `https://dominicparlotto.github.io/Lift-d/` — update them if the site moves to a custom domain.
 - `src/App.jsx` — root component, owns `user`/`tab`/`savedClips` state, renders the active tab + bottom nav
 - `src/components/` — one file per screen/section:
   - `AuthScreen.jsx` — login/signup flow shown when `user` is null
