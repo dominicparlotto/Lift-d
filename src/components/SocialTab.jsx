@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import ClipsView from "./ClipsView";
 import { GymList, GymRoom } from "./GymCommunity";
-import { ActionSheet, ReportSheet, BlockSheet } from "./Moderation";
+import { ActionSheet, ReportSheet, BlockSheet, Avatar } from "./Moderation";
+import { ReelVideo, useCue, CueBadge, CommentsSheet, CommentIcon } from "./Reel";
 import * as api from "../lib/api";
-import { initials, timeAgo } from "../utils/helpers";
+import { timeAgo } from "../utils/helpers";
+
+// Posts and clips share one id space for likes/saves/comment counts: "clip:<id>" for learning clips, "post:<id>" for posts.
+const clipKey=item=>item.kind==="curated"?item.key:`post:${item.id}`;
 
 export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
   const [liked,setLiked]=useState({});
@@ -47,6 +51,11 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
   useEffect(()=>{if(view!=="community")loadClips();},[view]);
   const [clipStart,setClipStart]=useState(null); // clip key to open when jumping from the Feed into Clips
   const watchInClips=key=>{setClipStart(key);setView("clips");};
+  const [feedMuted,setFeedMuted]=useState(true);
+  // Comments: the open sheet's post/clip, plus counts updated in this session (so Feed and Clips stay in sync).
+  const [commentsFor,setCommentsFor]=useState(null);
+  const [commentCounts,setCommentCounts]=useState({});
+  const countFor=item=>commentCounts[clipKey(item)]??item.commentCount??0;
 
   // Feed = members' posts + learning clips, newest first. (Members' video posts are already in both places.)
   const feedItems=[...posts.map(p=>({...p,feedKey:p.id})),...(clips||[]).filter(c=>c.kind==="curated").map(c=>({...c,feedKey:c.key}))]
@@ -108,7 +117,7 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
       </div>
 
       {view==="clips"?(
-        <div style={{flex:1,overflow:"hidden"}}><ClipsView user={user} actions={actions} clips={clips} onChanged={loadClips} filterMuscle={filterMuscle} filterSkill={filterSkill} startKey={clipStart} onStartHandled={()=>setClipStart(null)}/></div>
+        <div style={{flex:1,overflow:"hidden"}}><ClipsView user={user} actions={actions} clips={clips} onChanged={loadClips} filterMuscle={filterMuscle} filterSkill={filterSkill} startKey={clipStart} onStartHandled={()=>setClipStart(null)} onOpenComments={setCommentsFor} commentCountFor={countFor}/></div>
       ):view==="community"?(
         <GymList user={user} actions={actions} onOpen={setOpenGymId}/>
       ):(
@@ -117,43 +126,12 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
           {feedItems.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🎬</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12,marginBottom:16}}>Be the first to share a workout, PR, or tip.</div><button className="btn btn-sm" onClick={()=>setShowUpload(true)}>📹 Create a post</button></div>}
           {feedItems.length>0&&filteredPosts.length===0&&<div className="saved-empty"><div style={{fontSize:14}}>No posts match your search or filters.</div></div>}
           {filteredPosts.map(post=>{
-            if(post.kind==="curated")return <LearnCard key={post.feedKey} clip={post} user={user} actions={actions} liked={liked[post.key]} onLike={()=>setLiked(p=>({...p,[post.key]:!p[post.key]}))} onMenu={()=>setPostMenu(post)} onWatch={()=>watchInClips(post.key)}/>;
-            const a=post.author;
-            const following=user.following.includes(a.id);
-            return(
-            <div key={post.id} className="post-card">
-              <div className="post-header">
-                <div className="post-avatar" style={{background:"var(--grad)",overflow:"hidden"}}>{a.avatar?<img src={a.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials(a.name)}</div>
-                <div style={{flex:1}}>
-                  <div className="post-username">@{a.username}</div>
-                  <div className="post-time">{timeAgo(post.createdAt)}</div>
-                </div>
-                {a.id!==user.id&&<button className="follow-btn" style={{background:following?"var(--glass)":"var(--grad)",border:following?"1px solid var(--border)":"none",color:"#fff",padding:"5px 12px"}} onClick={()=>actions.toggleFollow(a.id)}>
-                  {following?"Following":"Follow"}
-                </button>}
-                <button className="post-more" onClick={()=>setPostMenu(post)} aria-label="Post options">⋯</button>
-              </div>
-              {post.mediaType==="video"&&post.mediaUrl&&<video className="post-media" src={post.mediaUrl} controls playsInline preload="metadata"/>}
-              {post.mediaType==="image"&&post.mediaUrl&&<img className="post-media" src={post.mediaUrl} alt="" loading="lazy"/>}
-              <div className="post-content">{post.content}</div>
-              <div className="post-actions">
-                <button className={`action-btn ${liked[post.id]?"liked":""}`} onClick={()=>setLiked(p=>({...p,[post.id]:!p[post.id]}))}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={liked[post.id]?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                  {liked[post.id]?1:0}
-                </button>
-                <button className={`action-btn ${saved[post.id]?"saved":""}`} onClick={()=>setSaved(p=>({...p,[post.id]:!p[post.id]}))}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={saved[post.id]?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                  Save
-                </button>
-                <button className={`action-btn ${boosted[post.id]?"boosted":""}`} onClick={()=>setBoosted(p=>({...p,[post.id]:!p[post.id]}))}>
-                  <span style={{fontSize:14}}>⚡</span>
-                  {boosted[post.id]?"Boosted!":"Boost"}
-                </button>
-                <button className="action-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
-                {post.mediaType==="video"&&post.mediaUrl&&<button className="action-btn" style={{marginLeft:"auto"}} onClick={()=>watchInClips(`post:${post.id}`)}>▶ Clips</button>}
-              </div>
-            </div>
-            );
+            const key=clipKey(post), clipLike=post.kind==="curated"||post.mediaType==="video";
+            return <FeedCard key={post.feedKey} item={post} user={user} actions={actions} muted={feedMuted} onToggleMute={()=>setFeedMuted(m=>!m)}
+              liked={!!liked[key]} onLike={()=>setLiked(p=>({...p,[key]:!p[key]}))}
+              saved={clipLike?user.savedClips.includes(key):!!saved[key]} onSave={()=>clipLike?actions.toggleSaveClip(key):setSaved(p=>({...p,[key]:!p[key]}))}
+              boosted={!!boosted[key]} onBoost={()=>setBoosted(p=>({...p,[key]:!p[key]}))}
+              comments={countFor(post)} onComments={()=>setCommentsFor(post)} onMenu={()=>setPostMenu(post)} onWatch={()=>watchInClips(key)}/>;
           })}
           {showUpload&&<div className="modal-overlay" onClick={closeUpload}><div className="modal-sheet" onClick={e=>e.stopPropagation()}>
             <div className="modal-handle"/><div className="modal-title">New Post</div>
@@ -181,42 +159,80 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
       {postMenu&&(postMenu.kind!=="curated"||user.isAdmin)&&<ActionSheet onClose={()=>setPostMenu(null)} options={postMenuOptions(postMenu)}/>}
       {reportTarget&&<ReportSheet target={reportTarget} onReport={actions.report} onBlock={actions.block} onClose={()=>setReportTarget(null)}/>}
       {blockTarget&&<BlockSheet username={blockTarget.username} onConfirm={()=>actions.block(blockTarget.userId)} onClose={()=>setBlockTarget(null)}/>}
+      {commentsFor&&<CommentsSheet item={commentsFor} user={user} actions={actions} onClose={()=>setCommentsFor(null)} onCount={n=>setCommentCounts(c=>({...c,[clipKey(commentsFor)]:n}))}/>}
     </div>
   );
 }
 
-// A Lift'd Learn clip in the Feed: the video, its coaching cues as a list, and a jump into Clips.
-function LearnCard({clip:c,user,actions,liked,onLike,onMenu,onWatch}){
-  const saved=user.savedClips.includes(c.key);
-  const tags=[c.muscle,c.equipment,c.skill].filter(t=>t&&t!=="All");
+// One post in the Feed, laid out like Instagram: header, media, actions, caption, comments.
+// Videos (members' clips and Lift'd Learn clips) use the same frame, crop and coaching cues as the Clips view,
+// play muted while on screen, and open in Clips when tapped.
+function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSave,boosted,onBoost,comments,onComments,onMenu,onWatch}){
+  const curated=item.kind==="curated";
+  const a=item.author;
+  const reel=curated?item:item.mediaType==="video"&&item.mediaUrl?{key:`post:${item.id}`,kind:"community",id:item.id,videoUrl:item.mediaUrl,cues:[],focusX:50,cuePosition:"bottom"}:null;
+  const hasMedia=!!reel||(item.mediaType==="image"&&!!item.mediaUrl);
+  const frameRef=useRef(null);
+  const [visible,setVisible]=useState(false);
+  useEffect(()=>{
+    const el=frameRef.current;if(!el)return;
+    const io=new IntersectionObserver(([e])=>setVisible(e.intersectionRatio>=0.6),{threshold:[0,0.6,1]});
+    io.observe(el);
+    return ()=>io.disconnect();
+  },[!!reel]);
+  const cueIdx=useCue(reel,visible);
+  const cue=reel&&visible&&reel.cues.length>0&&<CueBadge clip={reel} index={cueIdx}/>;
+  const following=a&&user.following.includes(a.id);
+  const tags=[item.muscle,item.equipment,item.skill].filter(t=>t&&t!=="All");
+  const name=curated?"Lift'd Learn":`@${a.username}`;
+  const caption=curated
+    ?<><span style={{fontWeight:700}}>{item.title}</span>{item.description&&<span style={{color:"var(--muted)"}}> {item.description}</span>}</>
+    :item.content;
+
   return(
     <div className="post-card">
       <div className="post-header">
-        <img className="post-avatar" src="../favicon.svg" alt="" style={{borderRadius:10}}/>
-        <div style={{flex:1}}>
-          <div className="post-username">Lift'd Learn<span className="learn-badge">FORM TIPS</span></div>
-          <div className="post-time">{timeAgo(c.createdAt)}</div>
+        {curated?<img className="post-avatar" src="../favicon.svg" alt="" style={{borderRadius:10}}/>:<Avatar profile={a} size={38}/>}
+        <div style={{flex:1,minWidth:0}}>
+          <div className="post-username">{name}{curated&&<span className="learn-badge">FORM TIPS</span>}</div>
+          <div className="post-time">{timeAgo(item.createdAt)}</div>
         </div>
-        {user.isAdmin&&<button className="post-more" onClick={onMenu} aria-label="Clip options">⋯</button>}
+        {!curated&&a.id!==user.id&&<button className="follow-btn" style={{background:following?"var(--glass)":"var(--grad)",border:following?"1px solid var(--border)":"none",color:"#fff",padding:"5px 12px"}} onClick={()=>actions.toggleFollow(a.id)}>
+          {following?"Following":"Follow"}
+        </button>}
+        {(!curated||user.isAdmin)&&<button className="post-more" onClick={onMenu} aria-label="Post options">⋯</button>}
       </div>
-      <video className="post-media" src={c.videoUrl} controls playsInline muted preload="metadata"/>
-      <div className="post-content"><div style={{fontWeight:700}}>{c.title}</div>{c.description&&<div style={{color:"var(--muted)",fontSize:13,marginTop:2}}>{c.description}</div>}</div>
-      {c.cues.length>0&&<ol className="feed-cues">{c.cues.map((cue,i)=><li key={i}>{cue}</li>)}</ol>}
-      {(tags.length>0||c.credit)&&<div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
-        {tags.map(t=><span key={t} className="tag">{t}</span>)}
-        {c.credit&&<span style={{fontSize:11,color:"var(--muted2)",marginLeft:"auto"}}>{c.credit}</span>}
+      {reel&&<div ref={frameRef} className="reel-frame" onClick={onWatch}>
+        <ReelVideo clip={reel} active={visible} muted={muted} onTap={onWatch}/>
+        <div className="reel-frame-shade"/>
+        {cue&&<div className={reel.cuePosition==="top"?"reel-cue-top":"reel-cue-bottom"} style={reel.cuePosition==="top"?{top:12}:undefined}>{cue}</div>}
+        <span className="reel-badge" aria-hidden="true">▶</span>
+        <button className="reel-mute" onClick={e=>{e.stopPropagation();onToggleMute();}} aria-label={muted?"Turn sound on":"Turn sound off"}>{muted?"🔇":"🔊"}</button>
       </div>}
+      {item.mediaType==="image"&&item.mediaUrl&&<img className="post-media" src={item.mediaUrl} alt="" loading="lazy"/>}
+      {!hasMedia&&<div className="post-content">{caption}</div>}
       <div className="post-actions">
-        <button className={`action-btn ${liked?"liked":""}`} onClick={onLike}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill={liked?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <button className={`action-btn ${liked?"liked":""}`} onClick={onLike} aria-label="Like">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={liked?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           {liked?1:0}
         </button>
-        <button className={`action-btn ${saved?"saved":""}`} onClick={()=>actions.toggleSaveClip(c.key)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill={saved?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          {saved?"Saved":"Save"}
+        <button className="action-btn" onClick={onComments} aria-label="Comments"><CommentIcon size={18}/>{comments}</button>
+        {!curated&&<button className={`action-btn ${boosted?"boosted":""}`} onClick={onBoost}>
+          <span style={{fontSize:14}}>⚡</span>
+          {boosted?"Boosted!":"Boost"}
+        </button>}
+        <button className="action-btn" aria-label="Share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
+        <button className={`action-btn ${saved?"saved":""}`} style={{marginLeft:"auto"}} onClick={onSave} aria-label={saved?"Saved":"Save"}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={saved?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </button>
-        <button className="action-btn" style={{marginLeft:"auto"}} onClick={onWatch}>▶ Watch in Clips</button>
       </div>
+      {hasMedia&&<div className="feed-caption"><strong>{name}</strong> {caption}</div>}
+      {curated&&(tags.length>0||item.credit)&&<div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginTop:8}}>
+        {tags.map(t=><span key={t} className="tag">{t}</span>)}
+        {item.credit&&<span style={{fontSize:11,color:"var(--muted2)",marginLeft:"auto"}}>{item.credit}</span>}
+      </div>}
+      {comments>0&&<button className="comment-link" onClick={onComments}>{comments===1?"View 1 comment":`View all ${comments} comments`}</button>}
+      <button className="comment-add" onClick={onComments}><Avatar profile={user} size={22}/>Add a comment…</button>
     </div>
   );
 }

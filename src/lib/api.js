@@ -8,7 +8,9 @@ function check({ data, error }) { if (error) throw error; return data; }
 export const toProfile = p => ({ id: p.id, name: p.name, username: p.username, bio: p.bio, location: p.location, skill: p.skill, avatar: p.avatar_url, createdAt: Date.parse(p.created_at) });
 const toWorkout = r => ({ id: r.id, exercise: r.exercise, group: r.muscle_group, sets: r.sets, loggedAt: Date.parse(r.logged_at) });
 const toFood = r => ({ id: r.id, name: r.name, grams: +r.grams, calories: +r.calories, protein: +r.protein, carbs: +r.carbs, fat: +r.fat });
-const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, mediaType: r.media_type || null, mediaUrl: r.media_url || null, mediaPath: r.media_path || null, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id });
+const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, mediaType: r.media_type || null, mediaUrl: r.media_url || null, mediaPath: r.media_path || null, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id, commentCount: commentCount(r) });
+// Rows selected with `comments(count)` carry how many comments they have (only ones the viewer can see).
+const commentCount = r => r.comments?.[0]?.count ?? 0;
 const byDay = (rows, convert) => rows.reduce((acc, r) => { (acc[r.day] ||= []).push(convert(r)); return acc; }, {});
 
 // Everything the signed-in user's screens need, shaped like the app's `user` object.
@@ -39,7 +41,7 @@ export async function loadUserData(authUser) {
 
 // Newest posts from everyone (blocked users are filtered out by the database).
 export async function loadFeed() {
-  const rows = check(await supabase.from("posts").select("*, author:profiles(*)").order("created_at", { ascending: false }).limit(100));
+  const rows = check(await supabase.from("posts").select("*, author:profiles(*), comments(count)").order("created_at", { ascending: false }).limit(100));
   return rows.filter(r => r.author).map(r => ({ ...toPost(r), author: toProfile(r.author) }));
 }
 
@@ -202,28 +204,30 @@ const toCuratedClip = c => ({
   key: `clip:${c.id}`, kind: "curated", id: c.id, title: c.title, description: c.description, videoUrl: clipUrl(c.video_path), videoPath: c.video_path,
   cues: c.cues || [], music: c.music_title ? { title: c.music_title, source: c.music_source || "" } : null, credit: c.credit,
   muscle: c.muscle, skill: c.skill, equipment: c.equipment, author: null, createdAt: Date.parse(c.created_at), isPublished: c.is_published,
+  focusX: c.focus_x ?? 50, cuePosition: c.cue_position || "bottom", commentCount: commentCount(c),
 });
 const toPostClip = p => ({
   key: `post:${p.id}`, kind: "community", id: p.id, title: p.content, description: "", videoUrl: p.mediaUrl, videoPath: p.mediaPath,
   cues: [], music: null, credit: "", muscle: p.muscle, skill: p.skill, equipment: p.equipment, author: p.author, createdAt: p.createdAt,
+  focusX: 50, cuePosition: "bottom", commentCount: p.commentCount,
 });
 export async function loadClips() {
   const [curated, posts] = await Promise.all([
-    supabase.from("clips").select("*").order("created_at", { ascending: false }).limit(100).then(check),
-    supabase.from("posts").select("*, author:profiles(*)").eq("media_type", "video").order("created_at", { ascending: false }).limit(100).then(check),
+    supabase.from("clips").select("*, comments(count)").order("created_at", { ascending: false }).limit(100).then(check),
+    supabase.from("posts").select("*, author:profiles(*), comments(count)").eq("media_type", "video").order("created_at", { ascending: false }).limit(100).then(check),
   ]);
   const community = posts.filter(r => r.author && r.media_url).map(r => toPostClip({ ...toPost(r), author: toProfile(r.author) }));
   // Learning clips first, then the newest community videos.
   return [...curated.map(toCuratedClip), ...community];
 }
-export async function addCuratedClip({ file, title, description, muscle, skill, equipment, cues, musicTitle, musicSource, credit }) {
+export async function addCuratedClip({ file, title, description, muscle, skill, equipment, cues, musicTitle, musicSource, credit, focusX = 50, cuePosition = "bottom" }) {
   const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
   const path = `${crypto.randomUUID()}.${ext}`;
   check(await supabase.storage.from("clips").upload(path, file, { contentType: file.type }));
   try {
     const row = check(await supabase.from("clips").insert({
       title, description, muscle, skill, equipment, video_path: path, cues,
-      music_title: musicTitle || null, music_source: musicSource || null, credit: credit || "",
+      music_title: musicTitle || null, music_source: musicSource || null, credit: credit || "", focus_x: focusX, cue_position: cuePosition,
     }).select().single());
     return toCuratedClip(row);
   } catch (e) {
@@ -235,3 +239,19 @@ export async function deleteCuratedClip(id, path) {
   check(await supabase.from("clips").delete().eq("id", id));
   await supabase.storage.from("clips").remove([path]).catch(() => {});
 }
+// Admin: re-frame a clip (horizontal crop + where the coaching cue sits).
+export const updateClipFraming = (id, { focusX, cuePosition }) =>
+  supabase.from("clips").update({ focus_x: focusX, cue_position: cuePosition }).eq("id", id).then(check);
+
+// ---------- Comments (on posts and on curated clips) ----------
+// item is a feed post or a clip; curated clips are commented on by clip id, everything else by post id.
+const commentTarget = item => item.kind === "curated" ? { clip_id: item.id } : { post_id: item.id };
+const toComment = c => ({ id: c.id, content: c.content, createdAt: Date.parse(c.created_at), authorId: c.user_id, author: c.author ? toProfile(c.author) : null });
+export async function loadComments(item) {
+  const [[col, id]] = Object.entries(commentTarget(item));
+  const rows = check(await supabase.from("comments").select("*, author:profiles(*)").eq(col, id).order("created_at").limit(500));
+  return rows.filter(r => r.author).map(toComment);
+}
+export const addComment = (item, content) =>
+  supabase.from("comments").insert({ ...commentTarget(item), content }).select("*, author:profiles(*)").single().then(check).then(toComment);
+export const deleteComment = id => supabase.from("comments").delete().eq("id", id).then(check);
