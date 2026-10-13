@@ -16,7 +16,7 @@ const byDay = (rows, convert) => rows.reduce((acc, r) => { (acc[r.day] ||= []).p
 // Everything the signed-in user's screens need, shaped like the app's `user` object.
 export async function loadUserData(authUser) {
   const uid = authUser.id;
-  const [profile, workouts, food, posts, following, followersCount, saved, admin, nutrition] = await Promise.all([
+  const [profile, workouts, food, posts, following, followersCount, saved, admin, nutrition, customExercises] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).single().then(check),
     supabase.from("workout_entries").select("*").eq("user_id", uid).order("logged_at").then(check),
     supabase.from("food_entries").select("*").eq("user_id", uid).order("created_at").then(check),
@@ -26,6 +26,7 @@ export async function loadUserData(authUser) {
     supabase.from("saved_clips").select("clip_id").eq("user_id", uid).then(check),
     supabase.from("admins").select("user_id").eq("user_id", uid).maybeSingle().then(check),
     supabase.from("nutrition_settings").select("*").eq("user_id", uid).maybeSingle().then(check),
+    supabase.from("custom_exercises").select("*").eq("user_id", uid).order("created_at").then(check),
   ]);
   return {
     ...toProfile(profile),
@@ -38,8 +39,15 @@ export async function loadUserData(authUser) {
     savedClips: saved.map(s => s.clip_id),
     isAdmin: !!admin,
     nutrition: toNutrition(nutrition),
+    customExercises: customExercises.map(toCustomExercise),
   };
 }
+
+// Exercises the user added themselves (only they can see them).
+const toCustomExercise = r => ({ id: r.id, group: r.muscle_group, name: r.name });
+export const addCustomExercise = (group, name) =>
+  supabase.from("custom_exercises").insert({ muscle_group: group, name }).select().single().then(check).then(toCustomExercise);
+export const deleteCustomExercise = id => supabase.from("custom_exercises").delete().eq("id", id).then(check);
 
 // Body stats + nutrition goal (private to the user). No row yet = no stats, generic targets.
 const num = v => v == null ? null : +v;

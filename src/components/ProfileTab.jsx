@@ -4,6 +4,7 @@ import { SKILL_TAGS } from "../data/social";
 import * as api from "../lib/api";
 import { PASSWORD_RULES } from "../utils/validation";
 import { useUsernameStatus } from "./AuthScreen";
+import PasswordInput from "./PasswordInput";
 import { BlockedAccountsSheet, DeleteAccountSheet } from "./Moderation";
 import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
 
@@ -192,10 +193,10 @@ function ChangePasswordModal({onSave,onClose}){
         <div className="modal-sub">Enter your current password, then choose a new one.</div>
         {err&&<div className="auth-error" style={{marginBottom:12}}>{err}</div>}
         <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:20}}>
-          <div><div style={fieldLabel}>Current password</div><input className="input-field" type="password" style={{width:"100%"}} value={cur} onChange={e=>setCur(e.target.value)}/></div>
-          <div><div style={fieldLabel}>New password</div><input className="input-field" type="password" style={{width:"100%"}} value={next} onChange={e=>setNext(e.target.value)}/>
+          <div><div style={fieldLabel}>Current password</div><PasswordInput className="input-field" style={{width:"100%"}} value={cur} onChange={e=>setCur(e.target.value)}/></div>
+          <div><div style={fieldLabel}>New password</div><PasswordInput className="input-field" style={{width:"100%"}} value={next} onChange={e=>setNext(e.target.value)}/>
             {next&&<div style={{marginTop:8,display:"flex",flexDirection:"column",gap:4}}>{PASSWORD_RULES.map(r=>{const ok=r.test(next);return<div key={r.label} style={{fontSize:12,fontWeight:600,color:ok?"var(--accent3)":"var(--muted)"}}>{ok?"✓":"○"} {r.label}</div>;})}</div>}</div>
-          <div><div style={fieldLabel}>Confirm new password</div><input className="input-field" type="password" style={{width:"100%"}} value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+          <div><div style={fieldLabel}>Confirm new password</div><PasswordInput className="input-field" style={{width:"100%"}} value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/>
             {confirm&&next!==confirm&&<div style={{fontSize:12,fontWeight:600,marginTop:6,color:"#FF7A6E"}}>✕ Passwords don't match</div>}</div>
         </div>
         <div style={{display:"flex",gap:10}}><button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button><button className="btn" style={{flex:1}} onClick={submit} disabled={busy}>{busy?"Updating…":"Update Password"}</button></div>

@@ -185,6 +185,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .set-input:focus{border-color:var(--accent);background:rgba(79,142,247,0.1);}
 .set-label{font-size:11px;color:var(--muted2);flex:1;}
 .set-done{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;font-size:13px;}
+.set-remove{width:26px;height:28px;border:none;background:none;border-radius:8px;color:var(--muted2);font-size:13px;cursor:pointer;flex-shrink:0;margin-left:-4px;}
+.set-remove:hover{color:#FF7A6E;background:rgba(255,122,110,0.1);}
+/* Custom (user-added) exercises */
+.custom-ex-add{display:flex;align-items:center;justify-content:space-between;gap:10px;width:calc(100% - 32px);margin:0 16px 8px;padding:11px 14px;border-radius:12px;border:1px dashed rgba(79,142,247,0.4);background:rgba(79,142,247,0.06);color:var(--accent);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;text-align:left;}
+.custom-ex-add span{font-size:11px;font-weight:500;color:var(--muted2);flex-shrink:0;}
+.custom-ex-form{display:flex;gap:6px;margin:0 16px 8px;}
+.custom-ex-tag{margin-left:8px;padding:1px 7px;border-radius:6px;background:rgba(62,207,207,0.14);color:var(--accent3);font-size:9px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;vertical-align:2px;}
+.custom-ex-remove{margin-left:auto;margin-right:10px;padding:4px 8px;border:none;border-radius:8px;background:none;color:var(--muted2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.custom-ex-remove.confirm{background:rgba(255,122,110,0.14);color:#FF7A6E;}
 .set-done.checked{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 2px 12px rgba(79,142,247,0.4);}
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 12px;}
 .stat-card{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:16px;}
@@ -281,6 +290,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .auth-input{width:100%;background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);font-family:var(--font);font-size:15px;font-weight:500;outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
 .auth-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,0.14);}
 .auth-input::placeholder{color:var(--muted2);}
+/* Password field with a show/hide eye button */
+.pw-wrap{position:relative;width:100%;}
+.pw-toggle{position:absolute;top:50%;right:6px;transform:translateY(-50%);width:36px;height:36px;border:none;background:none;border-radius:10px;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.pw-toggle:hover{color:var(--text);background:var(--glass);}
 .auth-btn{width:100%;padding:15px;background:var(--grad);color:#fff;border:none;border-radius:14px;font-family:var(--font);font-weight:700;font-size:16px;cursor:pointer;transition:opacity 0.2s;box-shadow:0 4px 24px rgba(79,142,247,0.35);}
 .auth-btn:hover{opacity:0.9;}
 .auth-btn-secondary{width:100%;padding:14px;background:none;border:1.5px solid var(--border2);color:var(--text);border-radius:14px;font-family:var(--font);font-weight:600;font-size:15px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;}

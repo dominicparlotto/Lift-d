@@ -8,7 +8,8 @@ export default function WorkoutTab({user,actions}){
   const [muscleGroup,setMuscleGroup]=useState("Chest");
   const [selectedEx,setSelectedEx]=useState(null);
   const [sets,setSets]=useState({});
-  const [checked,setChecked]=useState({});
+  const [adding,setAdding]=useState(false); const [newEx,setNewEx]=useState(""); const [addingBusy,setAddingBusy]=useState(false);
+  const [confirmRemove,setConfirmRemove]=useState(null); // id of a custom exercise waiting for a second tap to remove
   const [openDay,setOpenDay]=useState(null); // null = normal view; dateKey = focused day
   const [exIdx,setExIdx]=useState(0);
   const [view,setView]=useState("stats");
@@ -20,11 +21,36 @@ export default function WorkoutTab({user,actions}){
   const workouts=user.workouts;
   const todayKey=dateKey();
   const week=currentWeek();
-  const exercises=WORKOUTS[muscleGroup].filter(e=>!exSearch||e.toLowerCase().includes(exSearch.toLowerCase()));
-  function getSets(ex){return sets[ex]||[{weight:"",reps:""},{weight:"",reps:""},{weight:"",reps:""}];}
-  function updateSet(ex,i,f,v){setSets(prev=>{const s=[...(prev[ex]||[{weight:"",reps:""},{weight:"",reps:""},{weight:"",reps:""}])];s[i]={...s[i],[f]:v};return{...prev,[ex]:s};});}
-  function addSet(ex){setSets(prev=>({...prev,[ex]:[...getSets(ex),{weight:"",reps:""}]}));}
-  function toggleCheck(ex,i){const k=`${ex}-${i}`;setChecked(prev=>({...prev,[k]:!prev[k]}));}
+  // The user's own exercises (private to them) come first, then the built-in list.
+  const custom=user.customExercises.filter(c=>c.group===muscleGroup);
+  const allExercises=[...custom.map(c=>c.name),...WORKOUTS[muscleGroup].filter(e=>!custom.some(c=>c.name.toLowerCase()===e.toLowerCase()))];
+  const customByName=Object.fromEntries(custom.map(c=>[c.name,c]));
+  const exercises=allExercises.filter(e=>!exSearch||e.toLowerCase().includes(exSearch.toLowerCase()));
+  const blankSets=()=>[{weight:"",reps:"",done:false},{weight:"",reps:"",done:false},{weight:"",reps:"",done:false}];
+  function getSets(ex){return sets[ex]||blankSets();}
+  function editSets(ex,fn){setSets(prev=>({...prev,[ex]:fn(prev[ex]||blankSets())}));}
+  function updateSet(ex,i,f,v){editSets(ex,s=>s.map((x,j)=>j===i?{...x,[f]:v}:x));}
+  function addSet(ex){editSets(ex,s=>[...s,{weight:"",reps:"",done:false}]);}
+  // Remove a set added by mistake (always keep at least one).
+  function removeSet(ex,i){editSets(ex,s=>s.length>1?s.filter((_,j)=>j!==i):s);}
+  function toggleCheck(ex,i){editSets(ex,s=>s.map((x,j)=>j===i?{...x,done:!x.done}:x));}
+
+  function openAdd(){setNewEx(exSearch.trim());setAdding(true);}
+  async function addExercise(){
+    const name=newEx.trim().replace(/\s+/g," ");
+    if(name.length<2){actions.flash("Enter an exercise name.");return;}
+    const existing=allExercises.find(e=>e.toLowerCase()===name.toLowerCase());
+    if(existing){setAdding(false);setExSearch("");setSelectedEx(existing);actions.flash(`${existing} is already in ${muscleGroup}.`);return;}
+    setAddingBusy(true);
+    const ok=await actions.addCustomExercise(muscleGroup,name);
+    setAddingBusy(false);
+    if(ok){setAdding(false);setNewEx("");setExSearch("");setSelectedEx(name);}
+  }
+  async function removeExercise(c){
+    if(confirmRemove!==c.id){setConfirmRemove(c.id);return;}
+    setConfirmRemove(null);
+    if(await actions.removeCustomExercise(c.id)&&selectedEx===c.name)setSelectedEx(null);
+  }
   // Finishing an exercise saves its completed sets into today's workout.
   async function logWorkout(){
     if(!selectedEx||saving)return;
@@ -177,18 +203,29 @@ export default function WorkoutTab({user,actions}){
       ):(
         <div>
           <div style={{padding:"4px 16px 10px",fontSize:12,color:"var(--muted)"}}>Logging to <strong style={{color:"var(--accent3)"}}>Today</strong> — finish an exercise's sets and Save to add it to the day.</div>
-          <div className="muscle-tabs">{Object.keys(WORKOUTS).map(g=><button key={g} className={`muscle-tab ${muscleGroup===g?"active":""}`} onClick={()=>{setMuscleGroup(g);setSelectedEx(null);setExSearch("");}}>{g}</button>)}</div>
-          <div style={{padding:"0 16px 10px"}}><input className="input-field" style={{width:"100%"}} placeholder={`Search ${WORKOUTS[muscleGroup].length} exercises…`} value={exSearch} onChange={e=>setExSearch(e.target.value)}/></div>
-          {exercises.map(ex=>(
+          <div className="muscle-tabs">{Object.keys(WORKOUTS).map(g=><button key={g} className={`muscle-tab ${muscleGroup===g?"active":""}`} onClick={()=>{setMuscleGroup(g);setSelectedEx(null);setExSearch("");setAdding(false);setConfirmRemove(null);}}>{g}</button>)}</div>
+          <div style={{padding:"0 16px 10px"}}><input className="input-field" style={{width:"100%"}} placeholder={`Search ${allExercises.length} exercises…`} value={exSearch} onChange={e=>setExSearch(e.target.value)}/></div>
+          {/* Add your own exercise (only you see it) */}
+          {adding?(
+            <div className="custom-ex-form">
+              <input className="input-field" style={{flex:1,minWidth:0}} autoFocus maxLength={60} placeholder={`New ${muscleGroup.toLowerCase()} exercise`} value={newEx} onChange={e=>setNewEx(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addExercise();if(e.key==="Escape")setAdding(false);}}/>
+              <button className="btn btn-sm" onClick={addExercise} disabled={addingBusy}>{addingBusy?"…":"Add"}</button>
+              <button className="btn btn-sm btn-ghost" onClick={()=>setAdding(false)}>Cancel</button>
+            </div>
+          ):(
+            <button className="custom-ex-add" onClick={openAdd}>+ {exSearch.trim()&&exercises.length===0?`Add "${exSearch.trim()}" to ${muscleGroup}`:`Add your own ${muscleGroup.toLowerCase()} exercise`}<span>Only you'll see it</span></button>
+          )}
+          {exercises.map(ex=>{const mine=customByName[ex];return(
             <div key={ex}>
-              <div className={`exercise-row ${selectedEx===ex?"selected":""}`} onClick={()=>setSelectedEx(selectedEx===ex?null:ex)}>
-                <div><div className="exercise-name">{ex}</div><div className="exercise-sets">{getSets(ex).filter(s=>s.weight).length} sets logged</div></div>
+              <div className={`exercise-row ${selectedEx===ex?"selected":""}`} onClick={()=>{setSelectedEx(selectedEx===ex?null:ex);setConfirmRemove(null);}}>
+                <div style={{minWidth:0}}><div className="exercise-name">{ex}{mine&&<span className="custom-ex-tag">Yours</span>}</div><div className="exercise-sets">{getSets(ex).filter(s=>s.weight).length} sets logged</div></div>
+                {mine&&<button className={`custom-ex-remove ${confirmRemove===mine.id?"confirm":""}`} onClick={e=>{e.stopPropagation();removeExercise(mine);}}>{confirmRemove===mine.id?"Remove?":"✕"}</button>}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><polyline points={selectedEx===ex?"18 15 12 9 6 15":"6 9 12 15 18 9"}/></svg>
               </div>
-              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div>{getSets(ex).map((s,i)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${checked[`${ex}-${i}`]?"checked":""}`} onClick={()=>toggleCheck(ex,i)}>✓</button></div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
+              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" inputMode="decimal" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
             </div>
-          ))}
-          {exercises.length===0&&<div style={{padding:"32px 20px",textAlign:"center",color:"var(--muted)",fontSize:14}}>No exercises found for "{exSearch}"</div>}
+          );})}
+          {exercises.length===0&&<div style={{padding:"24px 20px",textAlign:"center",color:"var(--muted)",fontSize:14}}>No exercises found for "{exSearch}" — add it above.</div>}
         </div>
       )}
     </div>

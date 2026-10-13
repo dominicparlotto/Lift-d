@@ -77,6 +77,14 @@ export default function App(){
       const day=dateKey();const saved=await api.insertWorkout(day,entry);
       patch(u=>({workouts:{...u.workouts,[day]:[...(u.workouts[day]||[]),saved]}}));
     }),
+    addCustomExercise:(group,name)=>attempt(async()=>{
+      const saved=await api.addCustomExercise(group,name);
+      patch(u=>({customExercises:[...u.customExercises,saved]}));
+    },e=>e?.code==="23505"?"You already have an exercise with that name.":"Couldn't add the exercise — check your connection and try again."),
+    removeCustomExercise:id=>attempt(async()=>{
+      await api.deleteCustomExercise(id);
+      patch(u=>({customExercises:u.customExercises.filter(x=>x.id!==id)}));
+    },"Couldn't remove the exercise — try again."),
     addFood:food=>attempt(async()=>{
       const day=dateKey();const saved=await api.insertFood(day,food);
       patch(u=>({food:{...u.food,[day]:[...(u.food[day]||[]),saved]}}));

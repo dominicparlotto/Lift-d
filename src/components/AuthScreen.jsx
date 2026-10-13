@@ -3,6 +3,7 @@ import { SKILL_TAGS } from "../data/social";
 import { supabase } from "../lib/supabase";
 import { isUsernameAvailable } from "../lib/api";
 import { PASSWORD_RULES, validateUsername, friendlyAuthError } from "../utils/validation";
+import PasswordInput from "./PasswordInput";
 
 // Logo mark lives at the site root (public/favicon.svg); the app is served from /app/, so it's one level up.
 const LOGO="../favicon.svg";
@@ -128,7 +129,7 @@ export default function AuthScreen(){
         <div className="auth-logo-wrap" style={{paddingTop:44,paddingBottom:24}}><img className="auth-logo-mark" src={LOGO} alt="Lift'd logo"/><div className="auth-logo-name">Lift'd</div></div>
         <div className="auth-form">{err&&<div className="auth-error">{err}</div>}
           <input className="auth-input" type="email" autoComplete="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)}/>
-          <input className="auth-input" type="password" autoComplete="current-password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&signIn()}/>
+          <PasswordInput className="auth-input" autoComplete="current-password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&signIn()}/>
           <div className="auth-forgot"><button onClick={()=>go("forgot")}>Forgot password?</button></div>
           <button className="auth-btn" onClick={signIn} disabled={loading}>{loading?"Signing in…":"Sign In"}</button>
         </div>
@@ -164,7 +165,7 @@ export default function AuthScreen(){
             {usernameStatus.message&&<div style={{fontSize:12,fontWeight:600,marginTop:6,paddingLeft:2,color:bad?"#FF7A6E":usernameStatus.state==="available"?"var(--accent3)":"var(--muted)"}}>{bad?"✕ ":usernameStatus.state==="available"?"✓ ":""}{usernameStatus.message}</div>}
           </div>
           <div>
-            <input className="auth-input" type="password" autoComplete="new-password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)}/>
+            <PasswordInput className="auth-input" autoComplete="new-password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)}/>
             <PasswordChecklist pass={pass}/>
           </div>
           <button className="auth-btn" onClick={signUp} disabled={loading}>{loading?"Creating…":"Create Account"}</button>
@@ -200,8 +201,8 @@ export function NewPasswordScreen({onDone}){
         </>):(<>
           <div style={{paddingTop:56,marginBottom:28}}><div style={{fontSize:26,fontWeight:800,letterSpacing:"-0.5px",marginBottom:8}}>Set a new password</div><div style={{fontSize:14,color:"var(--muted)"}}>Choose a new password for your account.</div></div>
           <div className="auth-form">{err&&<div className="auth-error">{err}</div>}
-            <div><input className="auth-input" type="password" autoComplete="new-password" placeholder="New password" value={pass} onChange={e=>setPass(e.target.value)}/><PasswordChecklist pass={pass}/></div>
-            <input className="auth-input" type="password" autoComplete="new-password" placeholder="Confirm new password" value={confirm} onChange={e=>setConfirm(e.target.value)}/>
+            <div><PasswordInput className="auth-input" autoComplete="new-password" placeholder="New password" value={pass} onChange={e=>setPass(e.target.value)}/><PasswordChecklist pass={pass}/></div>
+            <PasswordInput className="auth-input" autoComplete="new-password" placeholder="Confirm new password" value={confirm} onChange={e=>setConfirm(e.target.value)}/>
             <button className="auth-btn" onClick={save} disabled={loading}>{loading?"Saving…":"Save new password"}</button>
           </div>
         </>)}
