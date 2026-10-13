@@ -73,6 +73,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .goal-row{display:flex;gap:8px;margin:0 16px 14px;}
 .goal-btn{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--border);background:var(--glass);color:var(--muted);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;}
 .goal-btn.active{background:rgba(79,142,247,0.14);border-color:rgba(79,142,247,0.45);color:var(--accent);}
+.goal-row .goal-btn{padding:10px 2px;font-size:11.5px;white-space:nowrap;}
+/* Personalized nutrition goals */
+.setup-card{display:flex;align-items:center;gap:12px;margin:0 16px 14px;padding:14px;border-radius:16px;background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.22);}
+.link-btn{display:inline-block;background:none;border:none;padding:0;margin-top:6px;color:var(--accent);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;}
+.field-hint{font-size:11px;color:var(--muted2);margin-top:6px;line-height:1.45;}
+.unit-toggle{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;flex-shrink:0;}
+.unit-toggle button{background:none;border:none;padding:6px 10px;color:var(--muted);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;}
+.unit-toggle button.active{background:rgba(79,142,247,0.16);color:var(--accent);}
+.target-preview{padding:14px;border-radius:14px;background:var(--glass);border:1px solid var(--border);}
+.target-tile{padding:10px 8px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);text-align:center;}
 .ai-card{margin:0 16px 24px;background:linear-gradient(135deg,rgba(79,142,247,0.09),rgba(108,99,255,0.09));border:1px solid rgba(79,142,247,0.22);border-radius:20px;padding:18px;}
 .ai-text{font-size:13px;line-height:1.65;color:rgba(238,242,255,0.65);}
 /* SOCIAL */

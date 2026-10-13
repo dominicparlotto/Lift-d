@@ -98,6 +98,14 @@ export default function App(){
         throw e;
       }
     },e=>/exceeded|too large|payload/i.test(e?.message||"")?"That file is too big — keep videos under 50 MB.":"Couldn't share your post — check your connection and try again."),
+    // Body stats / goal / custom targets: shown instantly, rolled back if the save fails.
+    saveNutrition:async next=>{
+      const prev=user.nutrition;
+      patch(()=>({nutrition:next}));
+      const ok=await attempt(()=>api.saveNutrition(user.id,next),"Couldn't save your goals — check your connection and try again.");
+      if(!ok)patch(()=>({nutrition:prev}));
+      return ok;
+    },
     // Follow + save flip instantly in the UI, then roll back if the server rejects it.
     toggleFollow:async id=>{
       const on=user.following.includes(id);

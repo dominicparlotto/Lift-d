@@ -16,7 +16,7 @@ const byDay = (rows, convert) => rows.reduce((acc, r) => { (acc[r.day] ||= []).p
 // Everything the signed-in user's screens need, shaped like the app's `user` object.
 export async function loadUserData(authUser) {
   const uid = authUser.id;
-  const [profile, workouts, food, posts, following, followersCount, saved, admin] = await Promise.all([
+  const [profile, workouts, food, posts, following, followersCount, saved, admin, nutrition] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).single().then(check),
     supabase.from("workout_entries").select("*").eq("user_id", uid).order("logged_at").then(check),
     supabase.from("food_entries").select("*").eq("user_id", uid).order("created_at").then(check),
@@ -25,6 +25,7 @@ export async function loadUserData(authUser) {
     supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", uid).then(r => { if (r.error) throw r.error; return r.count || 0; }),
     supabase.from("saved_clips").select("clip_id").eq("user_id", uid).then(check),
     supabase.from("admins").select("user_id").eq("user_id", uid).maybeSingle().then(check),
+    supabase.from("nutrition_settings").select("*").eq("user_id", uid).maybeSingle().then(check),
   ]);
   return {
     ...toProfile(profile),
@@ -36,8 +37,25 @@ export async function loadUserData(authUser) {
     followersCount,
     savedClips: saved.map(s => s.clip_id),
     isAdmin: !!admin,
+    nutrition: toNutrition(nutrition),
   };
 }
+
+// Body stats + nutrition goal (private to the user). No row yet = no stats, generic targets.
+const num = v => v == null ? null : +v;
+const toNutrition = r => ({
+  sex: r?.sex || null, birthYear: r?.birth_year || null, heightCm: num(r?.height_cm), weightKg: num(r?.weight_kg), activity: r?.activity || null,
+  units: r?.units || "imperial", goal: r?.goal || "maintenance",
+  custom: r?.custom_calories != null ? { cals: r.custom_calories, protein: r.custom_protein ?? 0, carbs: r.custom_carbs ?? 0, fat: r.custom_fat ?? 0 } : null,
+  weightUpdatedAt: r?.weight_updated_at ? Date.parse(r.weight_updated_at) : null,
+});
+export const saveNutrition = (uid, n) =>
+  supabase.from("nutrition_settings").upsert({
+    user_id: uid, sex: n.sex, birth_year: n.birthYear, height_cm: n.heightCm, weight_kg: n.weightKg, activity: n.activity,
+    units: n.units, goal: n.goal,
+    custom_calories: n.custom?.cals ?? null, custom_protein: n.custom?.protein ?? null, custom_carbs: n.custom?.carbs ?? null, custom_fat: n.custom?.fat ?? null,
+    weight_updated_at: n.weightUpdatedAt ? new Date(n.weightUpdatedAt).toISOString() : null, updated_at: new Date().toISOString(),
+  }).select().single().then(check).then(toNutrition);
 
 // Newest posts from everyone (blocked users are filtered out by the database).
 export async function loadFeed() {
