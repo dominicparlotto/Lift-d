@@ -332,3 +332,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 /* Who's training: check-in row */
 .checkin-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .checkin-row.here{justify-content:space-between;padding:10px 12px;border-radius:14px;background:rgba(62,207,207,0.08);border:1px solid rgba(62,207,207,0.25);}
+/* Media on posts + upload preview */
+.post-media{display:block;width:100%;max-height:480px;object-fit:contain;background:#000;border-radius:16px;margin-bottom:12px;}
+.upload-preview{position:relative;border-radius:16px;overflow:hidden;background:#000;border:1px solid var(--border);margin-bottom:14px;}
+.upload-preview video,.upload-preview img{display:block;width:100%;max-height:260px;object-fit:contain;}
+.upload-remove{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;cursor:pointer;}
+/* Clips feed */
+.clip-action{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;font-family:var(--font);padding:0;}
+.clip-action-icon{width:44px;height:44px;background:rgba(255,255,255,0.12);border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.2);}
+.clip-mute{position:absolute;top:14px;right:14px;z-index:20;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.45);font-size:16px;cursor:pointer;}
+.learn-badge{background:linear-gradient(135deg,#2481d7,#4A9EE8);border-radius:5px;padding:2px 6px;font-size:9px;font-weight:800;color:#fff;letter-spacing:0.5px;}
+.clip-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:15;width:68px;height:68px;border-radius:50%;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.45);backdrop-filter:blur(8px);color:#fff;font-size:26px;padding-left:5px;cursor:pointer;}

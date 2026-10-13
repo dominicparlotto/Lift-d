@@ -85,11 +85,19 @@ export default function App(){
       await api.deleteFood(id);
       patch(u=>({food:Object.fromEntries(Object.entries(u.food).map(([d,list])=>[d,list.filter(f=>f.id!==id)]))}));
     }),
-    createPost:post=>attempt(async()=>{
-      const saved=await api.insertPost(post);
-      patch(u=>({posts:[saved,...u.posts]}));
-      setPosts(ps=>[{...saved,author:user},...ps]);
-    }),
+    // post: {content, file?, muscle?} — a photo/video file is uploaded first, then the post is saved.
+    createPost:({file,...post})=>attempt(async()=>{
+      let media=null;
+      if(file)media=await api.uploadPostMedia(user.id,file);
+      try{
+        const saved=await api.insertPost({...post,mediaType:media?.mediaType,mediaPath:media?.path,mediaUrl:media?.url});
+        patch(u=>({posts:[saved,...u.posts]}));
+        setPosts(ps=>[{...saved,author:user},...ps]);
+      }catch(e){
+        if(media)await api.removePostMedia(media.path).catch(()=>{}); // don't leave an orphaned upload
+        throw e;
+      }
+    },e=>/exceeded|too large|payload/i.test(e?.message||"")?"That file is too big — keep videos under 50 MB.":"Couldn't share your post — check your connection and try again."),
     // Follow + save flip instantly in the UI, then roll back if the server rejects it.
     toggleFollow:async id=>{
       const on=user.following.includes(id);
@@ -125,7 +133,8 @@ export default function App(){
     },
     flash,
     deletePost:id=>attempt(async()=>{
-      await api.deletePost(id);
+      const mediaPath=(user.posts.find(p=>p.id===id)||posts.find(p=>p.id===id))?.mediaPath;
+      await api.deletePost(id,mediaPath);
       patch(u=>({posts:u.posts.filter(p=>p.id!==id)}));
       setPosts(ps=>ps.filter(p=>p.id!==id));
     },"Couldn't delete the post — try again."),

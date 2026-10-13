@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { BADGES } from "../data/badges";
-import { CLIP_POSTS, SKILL_TAGS } from "../data/social";
+import { SKILL_TAGS } from "../data/social";
+import * as api from "../lib/api";
 import { PASSWORD_RULES } from "../utils/validation";
 import { useUsernameStatus } from "./AuthScreen";
 import { BlockedAccountsSheet, DeleteAccountSheet } from "./Moderation";
@@ -21,6 +22,13 @@ export default function ProfileTab({user,actions}){
   const [showPassword,setShowPassword]=useState(false);
   const [showBlocked,setShowBlocked]=useState(false);
   const [showDelete,setShowDelete]=useState(false);
+  const [savedItems,setSavedItems]=useState(null);
+
+  // Saved tab: look up the user's saved clips (learning clips + members' videos).
+  useEffect(()=>{
+    if(tab!=="saved")return;
+    api.loadClips().then(all=>setSavedItems(all.filter(c=>user.savedClips.includes(c.key)))).catch(()=>setSavedItems([]));
+  },[tab,user.savedClips.length]);
 
   // Everything below is derived from what the user has actually logged — a new account shows zeros.
   const stats=trainingStats(user.workouts);
@@ -50,7 +58,7 @@ export default function ProfileTab({user,actions}){
 
       {tab==="posts"&&(<div>
         {user.posts.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>📝</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12}}>Share a workout from the Feed tab and it'll show up here.</div></div>}
-        {user.posts.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.hasVideo?"🎥":"📝"}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><span style={{fontSize:11,color:"var(--muted)"}}>{timeAgo(post.createdAt)}</span></div></div></div>)}
+        {user.posts.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.mediaType==="image"&&post.mediaUrl?<img src={post.mediaUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:12}}/>:post.mediaType==="video"?"🎥":"📝"}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><span style={{fontSize:11,color:"var(--muted)"}}>{timeAgo(post.createdAt)}</span></div></div></div>)}
         <div style={{height:24}}/>
       </div>)}
 
@@ -79,9 +87,10 @@ export default function ProfileTab({user,actions}){
       {tab==="saved"&&(<div style={{padding:"12px 0 24px"}}>
         <div style={{padding:"0 16px 10px",fontSize:13,color:"var(--muted)"}}>Tutorials and clips you've bookmarked for reference at the gym.</div>
         {user.savedClips.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🔖</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No saved content yet</div><div style={{fontSize:12}}>Tap the bookmark icon on any clip to save it here.</div></div>}
-        {user.savedClips.map(cid=>{const clip=CLIP_POSTS.find(c=>c.id===cid);if(!clip)return null;return(
-          <div key={cid} className="saved-item"><div className="saved-thumb" style={{background:`linear-gradient(135deg,${clip.color}44,${clip.color}22)`}}>{clip.emoji}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{clip.content}</div><div style={{fontSize:12,color:"var(--muted)"}}>@{clip.user} · {clip.muscle}</div></div>{chevron}</div>
-        );})}
+        {user.savedClips.length>0&&savedItems===null&&<div style={{padding:"8px 16px",color:"var(--muted)",fontSize:13}}>Loading…</div>}
+        {savedItems?.map(c=>(
+          <div key={c.key} className="saved-item"><div className="saved-thumb" style={{background:"linear-gradient(135deg,rgba(36,129,215,0.35),rgba(13,27,42,0.6))"}}>{c.kind==="curated"?"🎓":"🎬"}</div><div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{c.title}</div><div style={{fontSize:12,color:"var(--muted)"}}>{c.kind==="curated"?"Lift'd Learn":`@${c.author.username}`}{c.muscle&&c.muscle!=="All"?` · ${c.muscle}`:""}</div></div>{chevron}</div>
+        ))}
       </div>)}
 
       {tab==="settings"&&(<div style={{paddingTop:16}}>

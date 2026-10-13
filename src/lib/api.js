@@ -8,13 +8,13 @@ function check({ data, error }) { if (error) throw error; return data; }
 export const toProfile = p => ({ id: p.id, name: p.name, username: p.username, bio: p.bio, location: p.location, skill: p.skill, avatar: p.avatar_url, createdAt: Date.parse(p.created_at) });
 const toWorkout = r => ({ id: r.id, exercise: r.exercise, group: r.muscle_group, sets: r.sets, loggedAt: Date.parse(r.logged_at) });
 const toFood = r => ({ id: r.id, name: r.name, grams: +r.grams, calories: +r.calories, protein: +r.protein, carbs: +r.carbs, fat: +r.fat });
-const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id });
+const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, mediaType: r.media_type || null, mediaUrl: r.media_url || null, mediaPath: r.media_path || null, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id });
 const byDay = (rows, convert) => rows.reduce((acc, r) => { (acc[r.day] ||= []).push(convert(r)); return acc; }, {});
 
 // Everything the signed-in user's screens need, shaped like the app's `user` object.
 export async function loadUserData(authUser) {
   const uid = authUser.id;
-  const [profile, workouts, food, posts, following, followersCount, saved] = await Promise.all([
+  const [profile, workouts, food, posts, following, followersCount, saved, admin] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).single().then(check),
     supabase.from("workout_entries").select("*").eq("user_id", uid).order("logged_at").then(check),
     supabase.from("food_entries").select("*").eq("user_id", uid).order("created_at").then(check),
@@ -22,6 +22,7 @@ export async function loadUserData(authUser) {
     supabase.from("follows").select("following_id").eq("follower_id", uid).then(check),
     supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", uid).then(r => { if (r.error) throw r.error; return r.count || 0; }),
     supabase.from("saved_clips").select("clip_id").eq("user_id", uid).then(check),
+    supabase.from("admins").select("user_id").eq("user_id", uid).maybeSingle().then(check),
   ]);
   return {
     ...toProfile(profile),
@@ -32,6 +33,7 @@ export async function loadUserData(authUser) {
     following: following.map(f => f.following_id),
     followersCount,
     savedClips: saved.map(s => s.clip_id),
+    isAdmin: !!admin,
   };
 }
 
@@ -51,7 +53,19 @@ export const insertFood = (day, f) =>
 export const deleteFood = id => supabase.from("food_entries").delete().eq("id", id).then(check);
 
 export const insertPost = p =>
-  supabase.from("posts").insert({ content: p.content, has_video: !!p.hasVideo, muscle: p.muscle || "All", skill: p.skill || "All", equipment: p.equipment || "All" }).select().single().then(check).then(toPost);
+  supabase.from("posts").insert({
+    content: p.content, has_video: p.mediaType === "video", media_type: p.mediaType || null, media_path: p.mediaPath || null, media_url: p.mediaUrl || null,
+    muscle: p.muscle || "All", skill: p.skill || "All", equipment: p.equipment || "All",
+  }).select().single().then(check).then(toPost);
+
+// Uploads a photo/video for a post into the user's own folder; returns where it lives.
+export async function uploadPostMedia(uid, file) {
+  const ext = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "") || (file.type.startsWith("video") ? "mp4" : "jpg");
+  const path = `${uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  check(await supabase.storage.from("post-media").upload(path, file, { contentType: file.type }));
+  return { path, url: supabase.storage.from("post-media").getPublicUrl(path).data.publicUrl, mediaType: file.type.startsWith("video") ? "video" : "image" };
+}
+export const removePostMedia = path => supabase.storage.from("post-media").remove([path]).then(check);
 
 export const follow = id => supabase.from("follows").insert({ following_id: id }).then(check);
 export const unfollow = (uid, id) => supabase.from("follows").delete().eq("follower_id", uid).eq("following_id", id).then(check);
@@ -169,9 +183,55 @@ export async function loadBlocked() {
 }
 export const reportContent = ({ targetType, targetId, reason, details }) =>
   supabase.from("reports").insert({ target_type: targetType, target_id: targetId, reason, details: details || "" }).then(check);
-export const deletePost = id => supabase.from("posts").delete().eq("id", id).then(check);
+export async function deletePost(id, mediaPath) {
+  check(await supabase.from("posts").delete().eq("id", id));
+  if (mediaPath) await removePostMedia(mediaPath).catch(() => {}); // the post is gone either way
+}
 // Removes the user's photos, then their account (every table cascades from it).
 export async function deleteMyAccount(uid) {
   await removeAvatars(uid);
+  const media = check(await supabase.storage.from("post-media").list(uid, { limit: 1000 }));
+  if (media.length) check(await supabase.storage.from("post-media").remove(media.map(f => `${uid}/${f.name}`)));
   check(await supabase.rpc("delete_my_account"));
+}
+
+// ---------- Clips: curated learning clips + members' video posts ----------
+// Both become one shape for the Clips feed. key is what saved_clips stores ("clip:<id>" / "post:<id>").
+const clipUrl = path => supabase.storage.from("clips").getPublicUrl(path).data.publicUrl;
+const toCuratedClip = c => ({
+  key: `clip:${c.id}`, kind: "curated", id: c.id, title: c.title, description: c.description, videoUrl: clipUrl(c.video_path), videoPath: c.video_path,
+  cues: c.cues || [], music: c.music_title ? { title: c.music_title, source: c.music_source || "" } : null, credit: c.credit,
+  muscle: c.muscle, skill: c.skill, equipment: c.equipment, author: null, createdAt: Date.parse(c.created_at), isPublished: c.is_published,
+});
+const toPostClip = p => ({
+  key: `post:${p.id}`, kind: "community", id: p.id, title: p.content, description: "", videoUrl: p.mediaUrl, videoPath: p.mediaPath,
+  cues: [], music: null, credit: "", muscle: p.muscle, skill: p.skill, equipment: p.equipment, author: p.author, createdAt: p.createdAt,
+});
+export async function loadClips() {
+  const [curated, posts] = await Promise.all([
+    supabase.from("clips").select("*").order("created_at", { ascending: false }).limit(100).then(check),
+    supabase.from("posts").select("*, author:profiles(*)").eq("media_type", "video").order("created_at", { ascending: false }).limit(100).then(check),
+  ]);
+  const community = posts.filter(r => r.author && r.media_url).map(r => toPostClip({ ...toPost(r), author: toProfile(r.author) }));
+  // Learning clips first, then the newest community videos.
+  return [...curated.map(toCuratedClip), ...community];
+}
+export async function addCuratedClip({ file, title, description, muscle, skill, equipment, cues, musicTitle, musicSource, credit }) {
+  const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
+  const path = `${crypto.randomUUID()}.${ext}`;
+  check(await supabase.storage.from("clips").upload(path, file, { contentType: file.type }));
+  try {
+    const row = check(await supabase.from("clips").insert({
+      title, description, muscle, skill, equipment, video_path: path, cues,
+      music_title: musicTitle || null, music_source: musicSource || null, credit: credit || "",
+    }).select().single());
+    return toCuratedClip(row);
+  } catch (e) {
+    await supabase.storage.from("clips").remove([path]); // don't leave an orphaned video behind
+    throw e;
+  }
+}
+export async function deleteCuratedClip(id, path) {
+  check(await supabase.from("clips").delete().eq("id", id));
+  await supabase.storage.from("clips").remove([path]).catch(() => {});
 }

@@ -12,13 +12,16 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
   const [view,setView]=useState("feed");
   const [searchQ,setSearchQ]=useState("");
   const [openGymId,setOpenGymId]=useState(null);
+  const [clips,setClips]=useState(null); // null = not loaded yet
   const [showUpload,setShowUpload]=useState(false);
   const [posting,setPosting]=useState(false);
   const [uploadCaption,setUploadCaption]=useState("");
   const [uploadFile,setUploadFile]=useState(null);
+  const [uploadPreview,setUploadPreview]=useState(null); // object URL for the chosen photo/video
+  const [uploadMuscle,setUploadMuscle]=useState("All");
+  const [uploadErr,setUploadErr]=useState("");
   const [filterMuscle,setFilterMuscle]=useState("All");
   const [filterSkill,setFilterSkill]=useState("All");
-  const [filterEquip]=useState("All");
   const [showFilters,setShowFilters]=useState(false);
   const [postMenu,setPostMenu]=useState(null);
   const [reportTarget,setReportTarget]=useState(null);
@@ -39,6 +42,10 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
     })();
   },[joinCode]);
 
+  // Clips (learning clips + members' videos) load when the Clips view opens.
+  const loadClips=()=>api.loadClips().then(setClips).catch(e=>{console.error(e);setClips([]);actions.flash("Couldn't load clips.");});
+  useEffect(()=>{if(view==="clips")loadClips();},[view]);
+
   const filteredPosts=posts.filter(p=>{
     if(searchQ&&!p.content.toLowerCase().includes(searchQ.toLowerCase())&&!p.author.username.toLowerCase().includes(searchQ.toLowerCase()))return false;
     if(filterMuscle!=="All"&&p.muscle!==filterMuscle&&p.muscle!=="All")return false;
@@ -46,7 +53,31 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
     return true;
   });
 
-  async function submitPost(){if(!uploadCaption.trim()||posting)return;setPosting(true);const ok=await actions.createPost({content:uploadCaption.trim(),hasVideo:!!uploadFile});setPosting(false);if(ok){setUploadCaption("");setUploadFile(null);setShowUpload(false);}}
+  const MAX_MB=50, MAX_VIDEO_SECONDS=180;
+  function clearUpload(){if(uploadPreview)URL.revokeObjectURL(uploadPreview);setUploadFile(null);setUploadPreview(null);}
+  // Check the file before uploading: photos/videos only, ≤50 MB, videos ≤3 minutes.
+  async function pickUpload(file){
+    setUploadErr("");
+    if(!file)return;
+    const isVideo=file.type.startsWith("video/"),isImage=file.type.startsWith("image/");
+    if(!isVideo&&!isImage){setUploadErr("Choose a photo or a video.");return;}
+    if(file.size>MAX_MB*1024*1024){setUploadErr(`That file is ${(file.size/1048576).toFixed(0)} MB — the limit is ${MAX_MB} MB. Try a shorter clip.`);return;}
+    const url=URL.createObjectURL(file);
+    if(isVideo){
+      const seconds=await new Promise(res=>{const v=document.createElement("video");v.preload="metadata";v.onloadedmetadata=()=>res(v.duration);v.onerror=()=>res(0);v.src=url;});
+      if(seconds>MAX_VIDEO_SECONDS){URL.revokeObjectURL(url);setUploadErr("Videos can be up to 3 minutes long.");return;}
+    }
+    clearUpload();setUploadFile(file);setUploadPreview(url);
+  }
+  function closeUpload(){if(posting)return;clearUpload();setUploadErr("");setShowUpload(false);}
+  async function submitPost(){
+    if(posting)return;
+    if(!uploadCaption.trim()){setUploadErr("Add a caption.");return;}
+    setPosting(true);setUploadErr("");
+    const ok=await actions.createPost({content:uploadCaption.trim(),file:uploadFile,muscle:uploadMuscle});
+    setPosting(false);
+    if(ok){setUploadCaption("");setUploadMuscle("All");clearUpload();setShowUpload(false);}
+  }
   const postMenuOptions=post=>post.author.id===user.id
     ?[{icon:"🗑️",label:"Delete post",danger:true,onSelect:()=>actions.deletePost(post.id)}]
     :[{icon:"🚩",label:"Report post",onSelect:()=>setReportTarget({type:"post",id:post.id,userId:post.author.id,username:post.author.username})},
@@ -68,7 +99,7 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
       </div>
 
       {view==="clips"?(
-        <div style={{flex:1,overflow:"hidden"}}><ClipsView savedClips={user.savedClips} onSave={actions.toggleSaveClip} filterMuscle={filterMuscle} filterSkill={filterSkill} filterEquip={filterEquip}/></div>
+        <div style={{flex:1,overflow:"hidden"}}><ClipsView user={user} actions={actions} clips={clips} onChanged={loadClips} filterMuscle={filterMuscle} filterSkill={filterSkill}/></div>
       ):view==="community"?(
         <GymList user={user} actions={actions} onOpen={setOpenGymId}/>
       ):(
@@ -92,7 +123,8 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
                 </button>}
                 <button className="post-more" onClick={()=>setPostMenu(post)} aria-label="Post options">⋯</button>
               </div>
-              {post.hasVideo&&<div className="post-video"><div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 30% 40%,#4F8EF728 0%,transparent 65%)"}}/><div className="play-btn"><svg width="14" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>}
+              {post.mediaType==="video"&&post.mediaUrl&&<video className="post-media" src={post.mediaUrl} controls playsInline preload="metadata"/>}
+              {post.mediaType==="image"&&post.mediaUrl&&<img className="post-media" src={post.mediaUrl} alt="" loading="lazy"/>}
               <div className="post-content">{post.content}</div>
               <div className="post-actions">
                 <button className={`action-btn ${liked[post.id]?"liked":""}`} onClick={()=>setLiked(p=>({...p,[post.id]:!p[post.id]}))}>
@@ -112,7 +144,26 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
             </div>
             );
           })}
-          {showUpload&&<div className="modal-overlay" onClick={()=>setShowUpload(false)}><div className="modal-sheet" onClick={e=>e.stopPropagation()}><div className="modal-handle"/><div className="modal-title">New Post</div><div className="modal-sub">Share a workout clip. Videos must be under 5 minutes.</div><input ref={fileRef} type="file" accept="video/*,image/*" style={{display:"none"}} onChange={e=>setUploadFile(e.target.files[0])}/>{uploadFile?(<div style={{borderRadius:16,overflow:"hidden",height:130,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:14,position:"relative"}}><div style={{fontSize:40}}>🎥</div><div style={{position:"absolute",bottom:10,left:14,fontSize:11,color:"var(--muted)"}}>{uploadFile.name}</div><button onClick={()=>setUploadFile(null)} style={{position:"absolute",top:10,right:12,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:24,height:24,color:"#fff",cursor:"pointer",fontSize:12}}>✕</button></div>):(<div className="upload-area" onClick={()=>fileRef.current.click()}><div style={{fontSize:32,marginBottom:8}}>📹</div><div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Tap to upload video</div><div style={{fontSize:12,color:"var(--muted)"}}>MP4, MOV · max 5 minutes</div></div>)}<textarea className="input-field" placeholder="Write a caption…" value={uploadCaption} onChange={e=>setUploadCaption(e.target.value)} style={{width:"100%",minHeight:80,resize:"none",marginBottom:14}}/><button className="btn" style={{width:"100%"}} onClick={submitPost} disabled={posting}>{posting?"Posting…":"Share Post"}</button></div></div>}
+          {showUpload&&<div className="modal-overlay" onClick={closeUpload}><div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/><div className="modal-title">New Post</div>
+            <div className="modal-sub">Share a PR, a lift video, or a tip with your crew. Videos up to 3 minutes and 50 MB.</div>
+            <input ref={fileRef} type="file" accept="video/*,image/*" style={{display:"none"}} onChange={e=>{pickUpload(e.target.files[0]);e.target.value="";}}/>
+            {uploadErr&&<div className="auth-error" style={{marginBottom:12}}>{uploadErr}</div>}
+            {uploadFile?(
+              <div className="upload-preview">
+                {uploadFile.type.startsWith("video/")?<video src={uploadPreview} controls playsInline muted/>:<img src={uploadPreview} alt=""/>}
+                {!posting&&<button className="upload-remove" onClick={clearUpload} aria-label="Remove file">✕</button>}
+              </div>
+            ):(
+              <div className="upload-area" onClick={()=>fileRef.current.click()}><div style={{fontSize:32,marginBottom:8}}>📹</div><div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Add a photo or video</div><div style={{fontSize:12,color:"var(--muted)"}}>Optional · MP4, MOV, JPG, PNG</div></div>
+            )}
+            <textarea className="input-field" maxLength={2000} placeholder="Write a caption…" value={uploadCaption} onChange={e=>setUploadCaption(e.target.value)} style={{width:"100%",minHeight:80,resize:"none",marginBottom:12}}/>
+            <select className="input-field" style={{width:"100%",marginBottom:14,cursor:"pointer"}} value={uploadMuscle} onChange={e=>setUploadMuscle(e.target.value)} aria-label="Muscle group">
+              <option value="All">Muscle group (optional)</option>
+              {["Chest","Back","Legs","Shoulders","Arms","Core","Cardio"].map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+            <button className="btn" style={{width:"100%"}} onClick={submitPost} disabled={posting}>{posting?(uploadFile?"Uploading…":"Posting…"):"Share Post"}</button>
+          </div></div>}
         </div>
       )}
 
