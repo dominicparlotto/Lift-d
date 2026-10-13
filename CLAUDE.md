@@ -8,7 +8,9 @@ A mobile-style fitness app (React + Vite) with four tabs: Nutrition, Feed (socia
 - Backend: **Supabase** (project `liftd`, id `hzkoebfqglgcijibuuou`, region us-east-2). Auth = Supabase email/password; data in Postgres with Row Level Security on every table; profile photos in the public `avatars` storage bucket (`<user id>/...`). Client is `src/lib/supabase.js` (publishable key only — never a secret/service_role key).
 - `App.jsx` owns the Supabase session and the loaded `user` object, and passes `actions` (logWorkout, addFood, createPost, toggleFollow, updateProfile, changePassword, signOut, …) to the tabs. All DB reads/writes live in `src/lib/api.js`, which maps rows to the shapes the components use.
 - Schema (see Supabase migrations): profiles (auto-created by trigger on sign-up), workout_entries, food_entries, posts, follows, friend_adds, saved_clips, blocks, gyms, gym_members, gym_channels, messages, gym_checkins, reports; RPCs `is_username_available`, `delete_my_account`. Change the schema via new migrations, then re-run the Supabase security advisors.
-- New accounts start empty; stats, PRs and badges are derived from logged data. `src/data/` holds static reference data (exercise list, food DB, badge definitions) plus the remaining mock gym communities (gyms/chat/"who's training" are not wired to the backend yet).
+- New accounts start empty; stats, PRs and badges are derived from logged data. `src/data/` holds only static reference data (exercise list, food DB, badge definitions, skill tags); there is no mock user content.
+- Gyms are real: anyone can find/join/create one; members get chat (live via Supabase Realtime on `messages`), a weekly-volume leaderboard (`gym_leaderboard` RPC — returns only per-member weekly totals, members only), and live "who's training" check-ins (`gym_checkins`, active for `CHECKIN_HOURS`). Invite links are `…/app/#join=<invite_code>` (handled in `App.jsx`, also on `hashchange`). Friends are mutual: connected when both `friend_adds` rows exist.
+- Safety (required for the App Store): Report (posts/messages → `reports`, review them in the Supabase dashboard), Block (two-way, enforced by RLS via `private.is_blocked_between`), Blocked Accounts list, and in-app Delete Account (`delete_my_account` RPC; photos removed first).
 - Styling is a single global stylesheet (`src/styles.css`), plain CSS custom properties (dark theme), no CSS framework
 
 ## Structure
@@ -22,7 +24,10 @@ A mobile-style fitness app (React + Vite) with four tabs: Nutrition, Feed (socia
   - `SocialTab.jsx` — feed of posts + gyms, renders `ClipsView`
   - `ClipsView.jsx` — short-video-style clip feed used inside Social
   - `WorkoutTab.jsx` — exercise picker/logger against `WORKOUTS`
-  - `ProfileTab.jsx` — profile, badges, PR announcements, settings
+  - `ProfileTab.jsx` — profile, badges, PR announcements, settings (edit profile, change password, blocked accounts, delete account)
+  - `GymCommunity.jsx` — `GymList` (find/join/create gyms) and `GymRoom` (chat, channels, leaderboard, invite link, live check-in count)
+  - `WhoIsTraining.jsx` — live check-in card on the Workout tab, with mutual friend requests
+  - `Moderation.jsx` — shared sheets: action menu, report, block, blocked accounts, delete account, `Avatar`
 - `src/data/` — static mock data (`foodDb.js`, `workouts.js`, `badges.js`, `social.js`)
 - `src/utils/helpers.js` — small pure helpers (food math, date keys/current week, `bestSets`/`trainingStats`, avatar image cropping)
 - `src/utils/validation.js` — password rules, username format, friendly auth error messages

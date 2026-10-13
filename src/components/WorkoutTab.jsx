@@ -1,9 +1,8 @@
 import { useState, useRef } from "react";
 import { WORKOUTS } from "../data/workouts";
-import { INITIAL_GYMS } from "../data/social";
+import WhoIsTraining from "./WhoIsTraining";
 import { dateKey, shortDate, currentWeek, setVolume, bestSets } from "../utils/helpers";
 
-const MY_GYM=INITIAL_GYMS[0];
 
 export default function WorkoutTab({user,actions}){
   const [muscleGroup,setMuscleGroup]=useState("Chest");
@@ -15,10 +14,7 @@ export default function WorkoutTab({user,actions}){
   const [view,setView]=useState("stats");
   const [exSearch,setExSearch]=useState("");
   const [prPage,setPrPage]=useState(0);
-  const [livePage,setLivePage]=useState(0);
   const [saving,setSaving]=useState(false);
-  // "Who's training" members are still demo data, so friend status stays on this screen only.
-  const [friendStatus,setFriendStatus]=useState({});
   const carouselRef=useRef(null);
   // Workouts are saved to the account, keyed by date ("2026-10-11" → exercises done that day).
   const workouts=user.workouts;
@@ -42,11 +38,7 @@ export default function WorkoutTab({user,actions}){
     setSelectedEx(null);
     setView("stats");
   }
-  function addFriend(username){
-    setFriendStatus(prev=>({...prev,[username]:"requested"}));
-    // Demo only: simulates the other person accepting.
-    setTimeout(()=>setFriendStatus(prev=>({...prev,[username]:"friends"})),1500);
-  }
+
   function toggleDay(key){setOpenDay(prev=>prev===key?null:key);setExIdx(0);if(carouselRef.current)carouselRef.current.scrollLeft=0;}
   function onCarouselScroll(e){const el=e.currentTarget;setExIdx(Math.round(el.scrollLeft/el.clientWidth));}
   function slide(dir){if(carouselRef.current)carouselRef.current.scrollBy({left:dir*carouselRef.current.clientWidth,behavior:"smooth"});}
@@ -71,11 +63,6 @@ export default function WorkoutTab({user,actions}){
   const clampedPrPage=Math.min(prPage,prPageCount-1);
   const pagedRecords=records.slice(clampedPrPage*PR_PAGE_SIZE,clampedPrPage*PR_PAGE_SIZE+PR_PAGE_SIZE);
 
-  const liveNow=MY_GYM.liveNow||[];
-  const LIVE_PAGE_SIZE=4;
-  const livePageCount=Math.max(1,Math.ceil(liveNow.length/LIVE_PAGE_SIZE));
-  const clampedLivePage=Math.min(livePage,livePageCount-1);
-  const pagedLive=liveNow.slice(clampedLivePage*LIVE_PAGE_SIZE,clampedLivePage*LIVE_PAGE_SIZE+LIVE_PAGE_SIZE);
 
   return(
     <div>
@@ -182,35 +169,8 @@ export default function WorkoutTab({user,actions}){
                 ))}
               </div>
 
-              {/* Who's training now */}
-              <div className="card">
-                <div className="card-title" style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <span>Who's Training at {MY_GYM.name} Right Now 🟢</span>
-                  {livePageCount>1&&(
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                      <button onClick={()=>setLivePage(p=>Math.max(0,p-1))} disabled={clampedLivePage===0} style={{background:"none",border:"none",color:clampedLivePage===0?"var(--muted2)":"var(--accent)",cursor:clampedLivePage===0?"default":"pointer",fontSize:16,fontWeight:700,padding:0,lineHeight:1}}>‹</button>
-                      <span style={{fontSize:9,color:"var(--muted2)",fontWeight:700,letterSpacing:"0.5px"}}>{clampedLivePage+1}/{livePageCount}</span>
-                      <button onClick={()=>setLivePage(p=>Math.min(livePageCount-1,p+1))} disabled={clampedLivePage===livePageCount-1} style={{background:"none",border:"none",color:clampedLivePage===livePageCount-1?"var(--muted2)":"var(--accent)",cursor:clampedLivePage===livePageCount-1?"default":"pointer",fontSize:16,fontWeight:700,padding:0,lineHeight:1}}>›</button>
-                    </div>
-                  )}
-                </div>
-                {pagedLive.map(p=>{
-                  const status=friendStatus[p.user]||"none";
-                  return(
-                    <div key={p.user} className="food-item">
-                      <div><div className="food-name">@{p.user}</div><div className="food-amount">{p.muscle} day</div></div>
-                      {status==="friends"?(
-                        <span className="tag" style={{color:"var(--accent3)",background:"rgba(62,207,207,0.14)",borderColor:"rgba(62,207,207,0.24)"}}>✓ Friends</span>
-                      ):status==="requested"?(
-                        <button className="btn btn-sm btn-ghost" disabled>Requested…</button>
-                      ):(
-                        <button className="btn btn-sm" onClick={()=>addFriend(p.user)}>Add Friend</button>
-                      )}
-                    </div>
-                  );
-                })}
-                <div style={{fontSize:11,color:"var(--muted2)",marginTop:10}}>Add them as a friend to team up — you're only connected once they friend you back.</div>
-              </div>
+              {/* Who's training now (live) */}
+              <WhoIsTraining user={user} actions={actions}/>
             </div>
           )}
         </div>

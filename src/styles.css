@@ -315,3 +315,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .app-loading img{filter:drop-shadow(0 8px 24px rgba(36,129,215,0.35));animation:pulse-soft 1.6s ease-in-out infinite;}
 @keyframes pulse-soft{0%,100%{opacity:1;}50%{opacity:0.55;}}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);width:calc(100% - 32px);max-width:398px;z-index:300;background:#2a1418;border:1px solid rgba(255,80,80,0.35);color:#FFB3AB;border-radius:14px;padding:12px 16px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.45);}
+/* Action menus (Report / Block / Delete …) */
+.action-list{display:flex;flex-direction:column;gap:8px;}
+.action-item{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:14px;background:var(--glass);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-weight:600;font-size:15px;cursor:pointer;}
+.action-item:hover{background:var(--glass2);}
+.action-item.danger{color:#FF7A6E;}
+.post-more,.msg-more{background:none;border:none;color:var(--muted);font-size:18px;font-weight:800;line-height:1;cursor:pointer;padding:2px 6px;border-radius:8px;}
+.post-more:hover,.msg-more:hover{color:var(--text);background:var(--glass);}
+.msg-more{margin-left:auto;font-size:15px;opacity:0.7;}
+/* Report reasons */
+.reason-option{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:14px;font-weight:500;text-align:left;cursor:pointer;}
+.reason-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;}
+.reason-option.sel{border-color:var(--accent);background:rgba(79,142,247,0.1);}
+.reason-option.sel .reason-radio{border-color:var(--accent);background:radial-gradient(circle,var(--accent) 45%,transparent 50%);}
+.btn-danger:disabled{opacity:0.5;cursor:default;}
+/* Who's training: check-in row */
+.checkin-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.checkin-row.here{justify-content:space-between;padding:10px 12px;border-radius:14px;background:rgba(62,207,207,0.08);border:1px solid rgba(62,207,207,0.25);}

@@ -3,6 +3,7 @@ import { BADGES } from "../data/badges";
 import { CLIP_POSTS, SKILL_TAGS } from "../data/social";
 import { PASSWORD_RULES } from "../utils/validation";
 import { useUsernameStatus } from "./AuthScreen";
+import { BlockedAccountsSheet, DeleteAccountSheet } from "./Moderation";
 import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
 
 const avatarImg={width:"100%",height:"100%",borderRadius:"50%",objectFit:"cover",display:"block"};
@@ -18,6 +19,8 @@ export default function ProfileTab({user,actions}){
   const [sharedPR,setSharedPR]=useState({});
   const [showEdit,setShowEdit]=useState(false);
   const [showPassword,setShowPassword]=useState(false);
+  const [showBlocked,setShowBlocked]=useState(false);
+  const [showDelete,setShowDelete]=useState(false);
 
   // Everything below is derived from what the user has actually logged — a new account shows zeros.
   const stats=trainingStats(user.workouts);
@@ -87,15 +90,17 @@ export default function ProfileTab({user,actions}){
           <div className="settings-row" onClick={()=>setShowPassword(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔒</div><div><div className="settings-label">Change Password</div></div></div><div className="settings-right">{chevron}</div></div>
           <div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🔗</div><div><div className="settings-label">Connected Apps</div><div className="settings-sub">Apple Health, Strava</div></div></div><div className="settings-right">{chevron}</div></div>
         </div></div>
-        <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div></div></div><label className="toggle"><input type="checkbox" checked={priv} onChange={e=>setPriv(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div></div></div><label className="toggle"><input type="checkbox" checked={priv} onChange={e=>setPriv(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setShowBlocked(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Notifications</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔔</div><div><div className="settings-label">Push Notifications</div></div></div><label className="toggle"><input type="checkbox" checked={notifs} onChange={e=>setNotifs(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>setDark(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span>{chevron}</div></div></div></div>
         <div style={{padding:"0 16px 12px"}}><button className="btn-outline" style={{width:"100%",padding:"13px",marginBottom:10}} onClick={actions.signOut}>Sign Out</button></div>
-        <div style={{padding:"0 16px 32px"}}><button className="btn-danger">Delete Account</button></div>
+        <div style={{padding:"0 16px 32px"}}><button className="btn-danger" onClick={()=>setShowDelete(true)}>Delete Account</button></div>
       </div>)}
 
       {showEdit&&<EditProfileModal user={user} onClose={()=>setShowEdit(false)} onSave={async(fields,avatar)=>{if(await actions.updateProfile(fields,avatar))setShowEdit(false);}}/>}
       {showPassword&&<ChangePasswordModal onClose={()=>setShowPassword(false)} onSave={actions.changePassword}/>}
+      {showBlocked&&<BlockedAccountsSheet onUnblock={actions.unblock} onClose={()=>setShowBlocked(false)}/>}
+      {showDelete&&<DeleteAccountSheet onDelete={actions.deleteAccount} onClose={()=>setShowDelete(false)}/>}
     </div>
   );
 }

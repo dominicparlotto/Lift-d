@@ -76,3 +76,102 @@ export async function removeAvatars(uid, keepPath) {
   const old = files.map(f => `${uid}/${f.name}`).filter(p => p !== keepPath);
   if (old.length) check(await supabase.storage.from("avatars").remove(old));
 }
+
+// ---------- Gyms ----------
+export const CHECKIN_HOURS = 3; // a check-in counts as "training now" for this long
+const activeSince = () => new Date(Date.now() - CHECKIN_HOURS * 3600e3).toISOString();
+const toGym = g => ({ id: g.id, name: g.name, location: g.location, inviteCode: g.invite_code, createdBy: g.created_by, memberCount: g.gym_members?.[0]?.count ?? 0 });
+
+// Every gym, with member count, how many are training now, and the signed-in user's role (null = not a member).
+export async function loadGyms(uid) {
+  const [gyms, mine, checkins] = await Promise.all([
+    supabase.from("gyms").select("*, gym_members(count)").order("name").then(check),
+    supabase.from("gym_members").select("gym_id, role").eq("user_id", uid).then(check),
+    supabase.from("gym_checkins").select("gym_id").gte("checked_in_at", activeSince()).then(check),
+  ]);
+  const roles = Object.fromEntries(mine.map(m => [m.gym_id, m.role]));
+  const live = checkins.reduce((acc, c) => { acc[c.gym_id] = (acc[c.gym_id] || 0) + 1; return acc; }, {});
+  return gyms.map(g => ({ ...toGym(g), role: roles[g.id] || null, liveCount: live[g.id] || 0 }));
+}
+export async function loadGym(gymId, uid) {
+  const [g, me] = await Promise.all([
+    supabase.from("gyms").select("*, gym_members(count)").eq("id", gymId).single().then(check),
+    supabase.from("gym_members").select("role").eq("gym_id", gymId).eq("user_id", uid).maybeSingle().then(check),
+  ]);
+  return { ...toGym(g), role: me?.role || null };
+}
+// The database trigger makes the creator the owner and adds a #general channel.
+export const createGym = (name, location) => supabase.from("gyms").insert({ name, location }).select("id").single().then(check).then(g => g.id);
+export const joinGym = gymId => supabase.from("gym_members").insert({ gym_id: gymId }).then(r => { if (r.error && r.error.code !== "23505") throw r.error; });
+export const leaveGym = (uid, gymId) => supabase.from("gym_members").delete().eq("gym_id", gymId).eq("user_id", uid).then(check);
+export async function findGymByInvite(code) {
+  const rows = check(await supabase.from("gyms").select("id").eq("invite_code", code).limit(1));
+  return rows[0]?.id || null;
+}
+
+// ---------- Channels + chat ----------
+export const loadChannels = gymId => supabase.from("gym_channels").select("id, name").eq("gym_id", gymId).order("created_at").then(check);
+export const createChannel = (gymId, name) => supabase.from("gym_channels").insert({ gym_id: gymId, name }).select("id, name").single().then(check);
+
+const toMessage = m => ({ id: m.id, channelId: m.channel_id, content: m.content, createdAt: Date.parse(m.created_at), authorId: m.user_id, author: m.author ? toProfile(m.author) : null });
+export async function loadMessages(channelId) {
+  const rows = check(await supabase.from("messages").select("*, author:profiles(*)").eq("channel_id", channelId).order("created_at", { ascending: false }).limit(100));
+  return rows.reverse().map(toMessage);
+}
+export const sendMessage = (channelId, content) => supabase.from("messages").insert({ channel_id: channelId, content }).select("*, author:profiles(*)").single().then(check).then(toMessage);
+export const deleteMessage = id => supabase.from("messages").delete().eq("id", id).then(check);
+export const fetchProfile = id => supabase.from("profiles").select("*").eq("id", id).single().then(check).then(toProfile);
+
+// Live: calls onNew for every new message in this channel. Returns an unsubscribe function.
+export function subscribeToMessages(channelId, onNew) {
+  const ch = supabase.channel(`messages:${channelId}:${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `channel_id=eq.${channelId}` }, p => onNew(toMessage(p.new)))
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
+
+// ---------- "Who's training now" check-ins ----------
+const toCheckin = r => ({ userId: r.user_id, gymId: r.gym_id, muscle: r.muscle, checkedInAt: Date.parse(r.checked_in_at), profile: r.profile ? toProfile(r.profile) : null });
+export async function loadCheckins(gymId) {
+  const rows = check(await supabase.from("gym_checkins").select("*, profile:profiles(*)").eq("gym_id", gymId).gte("checked_in_at", activeSince()).order("checked_in_at", { ascending: false }));
+  return rows.filter(r => r.profile).map(toCheckin);
+}
+export async function loadMyCheckin(uid) {
+  const r = check(await supabase.from("gym_checkins").select("*").eq("user_id", uid).gte("checked_in_at", activeSince()).maybeSingle());
+  return r ? toCheckin(r) : null;
+}
+export const checkIn = (uid, gymId, muscle) => supabase.from("gym_checkins").upsert({ user_id: uid, gym_id: gymId, muscle, checked_in_at: new Date().toISOString() }).then(check);
+export const checkOut = uid => supabase.from("gym_checkins").delete().eq("user_id", uid).then(check);
+// Live: calls onChange whenever anyone checks in or out. Returns an unsubscribe function.
+export function subscribeToCheckins(onChange) {
+  const ch = supabase.channel(`checkins:${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "gym_checkins" }, () => onChange())
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
+
+// ---------- Friends (mutual: connected once both people add each other) ----------
+export async function loadFriendAdds(uid) {
+  const rows = check(await supabase.from("friend_adds").select("user_id, friend_id"));
+  return { added: rows.filter(r => r.user_id === uid).map(r => r.friend_id), addedMe: rows.filter(r => r.friend_id === uid).map(r => r.user_id) };
+}
+export const addFriend = id => supabase.from("friend_adds").insert({ friend_id: id }).then(r => { if (r.error && r.error.code !== "23505") throw r.error; });
+
+export const loadLeaderboard = gymId => supabase.rpc("gym_leaderboard", { p_gym: gymId }).then(check)
+  .then(rows => rows.map(r => ({ userId: r.user_id, username: r.username, name: r.name, avatar: r.avatar_url, volume: +r.volume })));
+
+// ---------- Safety: block, report, delete ----------
+export const blockUser = id => supabase.from("blocks").insert({ blocked_id: id }).then(r => { if (r.error && r.error.code !== "23505") throw r.error; });
+export const unblockUser = (uid, id) => supabase.from("blocks").delete().eq("blocker_id", uid).eq("blocked_id", id).then(check);
+export async function loadBlocked() {
+  const rows = check(await supabase.from("blocks").select("created_at, profile:profiles!blocks_blocked_id_fkey(*)").order("created_at", { ascending: false }));
+  return rows.filter(r => r.profile).map(r => toProfile(r.profile));
+}
+export const reportContent = ({ targetType, targetId, reason, details }) =>
+  supabase.from("reports").insert({ target_type: targetType, target_id: targetId, reason, details: details || "" }).then(check);
+export const deletePost = id => supabase.from("posts").delete().eq("id", id).then(check);
+// Removes the user's photos, then their account (every table cascades from it).
+export async function deleteMyAccount(uid) {
+  await removeAvatars(uid);
+  check(await supabase.rpc("delete_my_account"));
+}

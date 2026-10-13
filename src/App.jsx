@@ -21,6 +21,23 @@ export default function App(){
   const [posts,setPosts]=useState([]);
   const [tab,setTab]=useState("nutrition");
   const [toast,setToast]=useState("");
+  // Gym invite links look like …/app/#join=CODE. Remember the code through sign-in/sign-up.
+  const [joinCode,setJoinCode]=useState(()=>{
+    const fromLink=window.location.hash.match(/^#join=([A-Za-z0-9]+)$/)?.[1];
+    try{if(fromLink)sessionStorage.setItem("liftd.join",fromLink);return fromLink||sessionStorage.getItem("liftd.join");}
+    catch{return fromLink||null;}
+  });
+  // Also catch invite links opened while the app is already loaded (only the #hash changes, no page reload).
+  useEffect(()=>{
+    const onHash=()=>{const code=window.location.hash.match(/^#join=([A-Za-z0-9]+)$/)?.[1];if(code)setJoinCode(code);};
+    window.addEventListener("hashchange",onHash);
+    return ()=>window.removeEventListener("hashchange",onHash);
+  },[]);
+  function clearJoinCode(){
+    setJoinCode(null);
+    try{sessionStorage.removeItem("liftd.join");}catch{/* storage unavailable */}
+    if(window.location.hash.startsWith("#join="))window.history.replaceState(null,"",window.location.pathname);
+  }
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data})=>setSession(data.session));
@@ -44,6 +61,8 @@ export default function App(){
   useEffect(()=>{
     if(user&&tab==="social")api.loadFeed().then(setPosts).catch(e=>{console.error(e);flash("Couldn't load the feed.");});
   },[tab,user?.id]);
+  // An invite link opens the Feed tab, where the gym is joined and opened.
+  useEffect(()=>{if(user&&joinCode)setTab("social");},[user?.id,joinCode]);
 
   function flash(msg){setToast(msg);setTimeout(()=>setToast(t=>t===msg?"":t),3500);}
   // Runs a save; on failure shows a message and returns false so the screen can keep the user's input.
@@ -104,6 +123,28 @@ export default function App(){
       setTab("nutrition");setPosts([]);
       window.history.replaceState(null,"",window.location.pathname); // drop #signup/#signin so the start screen shows
     },
+    flash,
+    deletePost:id=>attempt(async()=>{
+      await api.deletePost(id);
+      patch(u=>({posts:u.posts.filter(p=>p.id!==id)}));
+      setPosts(ps=>ps.filter(p=>p.id!==id));
+    },"Couldn't delete the post — try again."),
+    report:r=>attempt(()=>api.reportContent(r),"Couldn't send your report — try again."),
+    // Blocking also unfollows them and removes their posts from view (the database hides them from then on).
+    block:userId=>attempt(async()=>{
+      await api.blockUser(userId);
+      if(user.following.includes(userId))await api.unfollow(user.id,userId);
+      patch(u=>({following:u.following.filter(f=>f!==userId)}));
+      setPosts(ps=>ps.filter(p=>p.author.id!==userId));
+      flash("Blocked. You won't see each other's posts or messages.");
+    },"Couldn't block — try again."),
+    unblock:userId=>attempt(()=>api.unblockUser(user.id,userId),"Couldn't unblock — try again."),
+    deleteAccount:()=>attempt(async()=>{
+      await api.deleteMyAccount(user.id);
+      await supabase.auth.signOut().catch(()=>{}); // the account is already gone; this just clears the local session
+      setTab("nutrition");setPosts([]);setUser(null);
+      window.history.replaceState(null,"",window.location.pathname);
+    },"Couldn't delete your account — check your connection and try again."),
   };
 
   if(recovering)return(<div style={shell}><NewPasswordScreen onDone={()=>setRecovering(false)}/></div>);
@@ -123,7 +164,7 @@ export default function App(){
       <div className="glow-top"/><div className="glow-bottom"/>
       <div className="content">
         {tab==="nutrition"&&<NutritionTab user={user} actions={actions} onOpenProfile={()=>setTab("profile")}/>}
-        {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions}/>}
+        {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions} joinCode={joinCode} onJoinHandled={clearJoinCode}/>}
         {tab==="workout"&&<WorkoutTab user={user} actions={actions}/>}
         {tab==="profile"&&<ProfileTab user={user} actions={actions}/>}
       </div>
