@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import ClipsView from "./ClipsView";
-import { GymList, GymRoom } from "./GymCommunity";
 import { ActionSheet, ReportSheet, BlockSheet, Avatar } from "./Moderation";
 import { ReelVideo, useCue, CueBadge, CommentsSheet, CommentIcon } from "./Reel";
 import * as api from "../lib/api";
@@ -9,13 +8,12 @@ import { timeAgo } from "../utils/helpers";
 // Posts and clips share one id space for likes/saves/comment counts: "clip:<id>" for learning clips, "post:<id>" for posts.
 const clipKey=item=>item.kind==="curated"?item.key:`post:${item.id}`;
 
-export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
+export default function SocialTab({user,posts,actions}){
   const [liked,setLiked]=useState({});
   const [saved,setSaved]=useState({});
   const [boosted,setBoosted]=useState({});
   const [view,setView]=useState("feed");
   const [searchQ,setSearchQ]=useState("");
-  const [openGymId,setOpenGymId]=useState(null);
   const [clips,setClips]=useState(null); // null = not loaded yet
   const [showUpload,setShowUpload]=useState(false);
   const [posting,setPosting]=useState(false);
@@ -32,23 +30,9 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
   const [blockTarget,setBlockTarget]=useState(null);
   const fileRef=useRef();
 
-  // Opened from a gym invite link (…/app/#join=CODE): join that gym and open it.
-  useEffect(()=>{
-    if(!joinCode)return;
-    (async()=>{
-      try{
-        const gymId=await api.findGymByInvite(joinCode);
-        if(!gymId){actions.flash("That invite link isn't valid anymore.");return;}
-        await api.joinGym(gymId);
-        setView("community");setOpenGymId(gymId);
-      }catch(e){console.error(e);actions.flash("Couldn't open that invite — try again.");}
-      finally{onJoinHandled();}
-    })();
-  },[joinCode]);
-
   // Clips (learning clips + members' videos) load for both Clips and the Feed — everything in Clips also shows in the Feed.
   const loadClips=()=>api.loadClips().then(setClips).catch(e=>{console.error(e);setClips([]);actions.flash("Couldn't load clips.");});
-  useEffect(()=>{if(view!=="community")loadClips();},[view]);
+  useEffect(()=>{loadClips();},[view]);
   const [clipStart,setClipStart]=useState(null); // clip key to open when jumping from the Feed into Clips
   const watchInClips=key=>{setClipStart(key);setView("clips");};
   const [feedMuted,setFeedMuted]=useState(true);
@@ -101,14 +85,12 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
     :[{icon:"🚩",label:"Report post",onSelect:()=>setReportTarget({type:"post",id:post.id,userId:post.author.id,username:post.author.username})},
       {icon:"🚫",label:`Block @${post.author.username}`,danger:true,onSelect:()=>setBlockTarget({userId:post.author.id,username:post.author.username})}];
 
-  if(openGymId)return <GymRoom gymId={openGymId} user={user} actions={actions} onBack={()=>setOpenGymId(null)}/>;
-
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
       <div className="search-wrap">
         <div className="search-container"><svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input className="search-input" placeholder="Search posts and people…" value={searchQ} onChange={e=>{setSearchQ(e.target.value);setView("feed");}}/></div>
-        <div className="chip-row">{[["feed","🎬 Feed"],["clips","▶ Clips"],["community","🏋️ Community"]].map(([v,l])=><button key={v} className={`chip ${view===v?"active":""}`} onClick={()=>{setView(v);setSearchQ("");}}>{l}</button>)}{(view==="feed"||view==="clips")&&<button className={`chip ${showFilters?"active":""}`} onClick={()=>setShowFilters(p=>!p)}>⚙ Filter</button>}</div>
-        {showFilters&&(view==="feed"||view==="clips")&&<div style={{paddingTop:8}}>
+        <div className="chip-row">{[["feed","🎬 Feed"],["clips","▶ Clips"]].map(([v,l])=><button key={v} className={`chip ${view===v?"active":""}`} onClick={()=>{setView(v);setSearchQ("");}}>{l}</button>)}{<button className={`chip ${showFilters?"active":""}`} onClick={()=>setShowFilters(p=>!p)}>⚙ Filter</button>}</div>
+        {showFilters&&<div style={{paddingTop:8}}>
           <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted2)",marginBottom:6}}>Muscle Group</div>
           <div className="filter-row">{["All","Chest","Back","Legs","Shoulders","Arms","Core","Cardio"].map(m=><button key={m} className={`filter-pill ${filterMuscle===m?"active":""}`} onClick={()=>setFilterMuscle(m)}>{m}</button>)}</div>
           <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted2)",marginBottom:6,marginTop:8}}>Skill Level</div>
@@ -118,8 +100,6 @@ export default function SocialTab({user,posts,actions,joinCode,onJoinHandled}){
 
       {view==="clips"?(
         <div style={{flex:1,overflow:"hidden"}}><ClipsView user={user} actions={actions} clips={clips} onChanged={loadClips} filterMuscle={filterMuscle} filterSkill={filterSkill} startKey={clipStart} onStartHandled={()=>setClipStart(null)} onOpenComments={setCommentsFor} commentCountFor={countFor}/></div>
-      ):view==="community"?(
-        <GymList user={user} actions={actions} onOpen={setOpenGymId}/>
       ):(
         <div style={{flex:1,overflow:"auto"}}>
           <div style={{padding:"10px 16px 4px",display:"flex",justifyContent:"flex-end"}}><button className="btn btn-sm" onClick={()=>setShowUpload(true)}>📹 Post</button></div>
@@ -197,7 +177,7 @@ function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSav
           <div className="post-username">{name}{curated&&<span className="learn-badge">FORM TIPS</span>}</div>
           <div className="post-time">{timeAgo(item.createdAt)}</div>
         </div>
-        {!curated&&a.id!==user.id&&<button className="follow-btn" style={{background:following?"var(--glass)":"var(--grad)",border:following?"1px solid var(--border)":"none",color:"#fff",padding:"5px 12px"}} onClick={()=>actions.toggleFollow(a.id)}>
+        {!curated&&a.id!==user.id&&<button className="follow-btn" style={{background:following?"var(--glass)":"var(--grad)",border:following?"1px solid var(--border)":"none",color:following?"var(--text)":"#fff",padding:"5px 12px"}} onClick={()=>actions.toggleFollow(a.id)}>
           {following?"Following":"Follow"}
         </button>}
         {(!curated||user.isAdmin)&&<button className="post-more" onClick={onMenu} aria-label="Post options">⋯</button>}

@@ -5,6 +5,8 @@ import * as api from "../lib/api";
 import { PASSWORD_RULES } from "../utils/validation";
 import { useUsernameStatus } from "./AuthScreen";
 import PasswordInput from "./PasswordInput";
+import { FeedbackSheet, FeedbackInbox } from "./Feedback";
+import { getTheme, setTheme } from "../utils/theme";
 import { BlockedAccountsSheet, DeleteAccountSheet } from "./Moderation";
 import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
 
@@ -16,7 +18,8 @@ export default function ProfileTab({user,actions}){
   const [tab,setTab]=useState("posts");
   const [notifs,setNotifs]=useState(true);
   const [priv,setPriv]=useState(false);
-  const [dark,setDark]=useState(true);
+  const [dark,setDark]=useState(()=>getTheme()==="dark");
+  const [showFeedback,setShowFeedback]=useState(false); const [showInbox,setShowInbox]=useState(false);
   const [units,setUnits]=useState("imperial");
   const [sharedPR,setSharedPR]=useState({});
   const [showEdit,setShowEdit]=useState(false);
@@ -59,7 +62,7 @@ export default function ProfileTab({user,actions}){
 
       {tab==="posts"&&(<div>
         {user.posts.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>📝</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12}}>Share a workout from the Feed tab and it'll show up here.</div></div>}
-        {user.posts.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.mediaType==="image"&&post.mediaUrl?<img src={post.mediaUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:12}}/>:post.mediaType==="video"?"🎥":"📝"}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><span style={{fontSize:11,color:"var(--muted)"}}>{timeAgo(post.createdAt)}</span></div></div></div>)}
+        {user.posts.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid var(--line)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.mediaType==="image"&&post.mediaUrl?<img src={post.mediaUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:12}}/>:post.mediaType==="video"?"🎥":"📝"}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><span style={{fontSize:11,color:"var(--muted)"}}>{timeAgo(post.createdAt)}</span></div></div></div>)}
         <div style={{height:24}}/>
       </div>)}
 
@@ -102,11 +105,17 @@ export default function ProfileTab({user,actions}){
         </div></div>
         <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div></div></div><label className="toggle"><input type="checkbox" checked={priv} onChange={e=>setPriv(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setShowBlocked(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Notifications</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔔</div><div><div className="settings-label">Push Notifications</div></div></div><label className="toggle"><input type="checkbox" checked={notifs} onChange={e=>setNotifs(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div></div></div>
-        <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>setDark(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span>{chevron}</div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div><div className="settings-sub">{dark?"On":"Off — light mode"}</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>{setDark(e.target.checked);setTheme(e.target.checked?"dark":"light");}}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span>{chevron}</div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Support</div><div className="settings-list">
+          <div className="settings-row" onClick={()=>setShowFeedback(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>💬</div><div><div className="settings-label">Send Feedback</div><div className="settings-sub">Report a bug or suggest an idea</div></div></div><div className="settings-right">{chevron}</div></div>
+          {user.isAdmin&&<div className="settings-row" onClick={()=>setShowInbox(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📥</div><div><div className="settings-label">Feedback Inbox</div><div className="settings-sub">Admin · read what people sent</div></div></div><div className="settings-right">{chevron}</div></div>}
+        </div></div>
         <div style={{padding:"0 16px 12px"}}><button className="btn-outline" style={{width:"100%",padding:"13px",marginBottom:10}} onClick={actions.signOut}>Sign Out</button></div>
         <div style={{padding:"0 16px 32px"}}><button className="btn-danger" onClick={()=>setShowDelete(true)}>Delete Account</button></div>
       </div>)}
 
+      {showFeedback&&<FeedbackSheet actions={actions} onClose={()=>setShowFeedback(false)}/>}
+      {showInbox&&<FeedbackInbox actions={actions} onClose={()=>setShowInbox(false)}/>}
       {showEdit&&<EditProfileModal user={user} onClose={()=>setShowEdit(false)} onSave={async(fields,avatar)=>{if(await actions.updateProfile(fields,avatar))setShowEdit(false);}}/>}
       {showPassword&&<ChangePasswordModal onClose={()=>setShowPassword(false)} onSave={actions.changePassword}/>}
       {showBlocked&&<BlockedAccountsSheet onUnblock={actions.unblock} onClose={()=>setShowBlocked(false)}/>}

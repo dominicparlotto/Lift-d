@@ -79,7 +79,7 @@ export default function WhoIsTraining({user,actions}){
       </div>
 
       {gyms===null&&<div style={{color:"var(--muted)",fontSize:13}}>Loading…</div>}
-      {gyms?.length===0&&<div style={{color:"var(--muted)",fontSize:13,lineHeight:1.6}}>Join your gym in <strong style={{color:"var(--text)"}}>Feed → Community</strong> to check in and see who's training there right now.</div>}
+      {gyms?.length===0&&<div style={{color:"var(--muted)",fontSize:13,lineHeight:1.6}}>Join your gym in <strong style={{color:"var(--text)"}}>the Community tab</strong> to check in and see who's training there right now.</div>}
 
       {gym&&<>
         {gyms.length>1&&<select className="input-field" style={{width:"100%",marginBottom:12,cursor:"pointer"}} value={gymId} onChange={e=>{setGymId(e.target.value);setPage(0);}}>{gyms.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select>}

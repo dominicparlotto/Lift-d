@@ -7,6 +7,8 @@
     <!-- The app shell is just a sign-in screen; keep it out of search results so the homepage ranks instead. -->
     <meta name="robots" content="noindex" />
     <meta name="theme-color" content="#080C18" />
+    <!-- Apply the saved light/dark choice before anything draws (see src/utils/theme.js). -->
+    <script>try{if(localStorage.getItem("liftd.theme")==="light"){document.documentElement.dataset.theme="light";document.querySelector('meta[name="theme-color"]').content="#F3F5FA";}}catch(e){}</script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>

@@ -3,6 +3,7 @@ import "./styles.css";
 import AuthScreen, { NewPasswordScreen } from "./components/AuthScreen";
 import NutritionTab from "./components/NutritionTab";
 import SocialTab from "./components/SocialTab";
+import CommunityTab from "./components/CommunityTab";
 import WorkoutTab from "./components/WorkoutTab";
 import ProfileTab from "./components/ProfileTab";
 import { supabase } from "./lib/supabase";
@@ -61,8 +62,8 @@ export default function App(){
   useEffect(()=>{
     if(user&&tab==="social")api.loadFeed().then(setPosts).catch(e=>{console.error(e);flash("Couldn't load the feed.");});
   },[tab,user?.id]);
-  // An invite link opens the Feed tab, where the gym is joined and opened.
-  useEffect(()=>{if(user&&joinCode)setTab("social");},[user?.id,joinCode]);
+  // An invite link opens the Community tab, where the gym is joined and opened.
+  useEffect(()=>{if(user&&joinCode)setTab("community");},[user?.id,joinCode]);
 
   function flash(msg){setToast(msg);setTimeout(()=>setToast(t=>t===msg?"":t),3500);}
   // Runs a save; on failure shows a message and returns false so the screen can keep the user's input.
@@ -180,6 +181,7 @@ export default function App(){
   const tabs=[
     {id:"nutrition",label:"Nutrition",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/><path d="M12 8v4l3 3"/></svg>},
     {id:"social",label:"Feed",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>},
+    {id:"community",label:"Community",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>},
     {id:"workout",label:"Workout",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 4v16M18 4v16M2 9h4M18 9h4M2 15h4M18 15h4M6 9h12M6 15h12"/></svg>},
     {id:"profile",label:"Profile",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
   ];
@@ -189,7 +191,8 @@ export default function App(){
       <div className="glow-top"/><div className="glow-bottom"/>
       <div className="content">
         {tab==="nutrition"&&<NutritionTab user={user} actions={actions} onOpenProfile={()=>setTab("profile")}/>}
-        {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions} joinCode={joinCode} onJoinHandled={clearJoinCode}/>}
+        {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions}/>}
+        {tab==="community"&&<CommunityTab user={user} actions={actions} joinCode={joinCode} onJoinHandled={clearJoinCode}/>}
         {tab==="workout"&&<WorkoutTab user={user} actions={actions}/>}
         {tab==="profile"&&<ProfileTab user={user} actions={actions}/>}
       </div>

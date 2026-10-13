@@ -43,6 +43,15 @@ export async function loadUserData(authUser) {
   };
 }
 
+// In-app feedback: anyone can send; only admins can read (Feedback Inbox in Settings, or the Supabase dashboard).
+export const sendFeedback = ({ category, message }) =>
+  supabase.from("feedback").insert({ category, message, device: navigator.userAgent.slice(0, 300) }).then(check);
+export async function loadFeedback() {
+  const rows = check(await supabase.from("feedback").select("*, author:profiles(*)").order("created_at", { ascending: false }).limit(200));
+  return rows.map(r => ({ id: r.id, category: r.category, message: r.message, device: r.device, createdAt: Date.parse(r.created_at), author: r.author ? toProfile(r.author) : null }));
+}
+export const deleteFeedback = id => supabase.from("feedback").delete().eq("id", id).then(check);
+
 // Exercises the user added themselves (only they can see them).
 const toCustomExercise = r => ({ id: r.id, group: r.muscle_group, name: r.name });
 export const addCustomExercise = (group, name) =>
