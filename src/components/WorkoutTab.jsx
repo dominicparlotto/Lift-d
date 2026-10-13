@@ -5,7 +5,7 @@ import { dateKey, shortDate, currentWeek, setVolume, bestSets } from "../utils/h
 
 const MY_GYM=INITIAL_GYMS[0];
 
-export default function WorkoutTab({user,updateUser}){
+export default function WorkoutTab({user,actions}){
   const [muscleGroup,setMuscleGroup]=useState("Chest");
   const [selectedEx,setSelectedEx]=useState(null);
   const [sets,setSets]=useState({});
@@ -16,10 +16,12 @@ export default function WorkoutTab({user,updateUser}){
   const [exSearch,setExSearch]=useState("");
   const [prPage,setPrPage]=useState(0);
   const [livePage,setLivePage]=useState(0);
+  const [saving,setSaving]=useState(false);
+  // "Who's training" members are still demo data, so friend status stays on this screen only.
+  const [friendStatus,setFriendStatus]=useState({});
   const carouselRef=useRef(null);
-  // Workouts are saved on the account, keyed by date ("2026-10-11" → exercises done that day).
+  // Workouts are saved to the account, keyed by date ("2026-10-11" → exercises done that day).
   const workouts=user.workouts;
-  const friendStatus=user.friends;
   const todayKey=dateKey();
   const week=currentWeek();
   const exercises=WORKOUTS[muscleGroup].filter(e=>!exSearch||e.toLowerCase().includes(exSearch.toLowerCase()));
@@ -28,20 +30,22 @@ export default function WorkoutTab({user,updateUser}){
   function addSet(ex){setSets(prev=>({...prev,[ex]:[...getSets(ex),{weight:"",reps:""}]}));}
   function toggleCheck(ex,i){const k=`${ex}-${i}`;setChecked(prev=>({...prev,[k]:!prev[k]}));}
   // Finishing an exercise saves its completed sets into today's workout.
-  function logWorkout(){
-    if(!selectedEx)return;
+  async function logWorkout(){
+    if(!selectedEx||saving)return;
     const s=getSets(selectedEx).filter(s=>s.weight&&s.reps).map(s=>({weight:parseFloat(s.weight),reps:parseInt(s.reps)}));
     if(!s.length)return;
-    const entry={exercise:selectedEx,group:muscleGroup,sets:s,loggedAt:Date.now()};
-    updateUser(u=>({workouts:{...u.workouts,[todayKey]:[...(u.workouts[todayKey]||[]),entry]}}));
+    setSaving(true);
+    const ok=await actions.logWorkout({exercise:selectedEx,group:muscleGroup,sets:s});
+    setSaving(false);
+    if(!ok)return; // keep the entered sets so nothing is lost
     setSets(prev=>{const n={...prev};delete n[selectedEx];return n;});
     setSelectedEx(null);
     setView("stats");
   }
   function addFriend(username){
-    updateUser(u=>({friends:{...u.friends,[username]:"requested"}}));
-    // Prototype: simulates the other person accepting. Real friend requests need a backend.
-    setTimeout(()=>updateUser(u=>({friends:{...u.friends,[username]:"friends"}})),1500);
+    setFriendStatus(prev=>({...prev,[username]:"requested"}));
+    // Demo only: simulates the other person accepting.
+    setTimeout(()=>setFriendStatus(prev=>({...prev,[username]:"friends"})),1500);
   }
   function toggleDay(key){setOpenDay(prev=>prev===key?null:key);setExIdx(0);if(carouselRef.current)carouselRef.current.scrollLeft=0;}
   function onCarouselScroll(e){const el=e.currentTarget;setExIdx(Math.round(el.scrollLeft/el.clientWidth));}
@@ -221,7 +225,7 @@ export default function WorkoutTab({user,updateUser}){
                 <div><div className="exercise-name">{ex}</div><div className="exercise-sets">{getSets(ex).filter(s=>s.weight).length} sets logged</div></div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><polyline points={selectedEx===ex?"18 15 12 9 6 15":"6 9 12 15 18 9"}/></svg>
               </div>
-              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div>{getSets(ex).map((s,i)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${checked[`${ex}-${i}`]?"checked":""}`} onClick={()=>toggleCheck(ex,i)}>✓</button></div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout}>Save Exercise to Today</button></div></div>}
+              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div>{getSets(ex).map((s,i)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${checked[`${ex}-${i}`]?"checked":""}`} onClick={()=>toggleCheck(ex,i)}>✓</button></div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
             </div>
           ))}
           {exercises.length===0&&<div style={{padding:"32px 20px",textAlign:"center",color:"var(--muted)",fontSize:14}}>No exercises found for "{exSearch}"</div>}

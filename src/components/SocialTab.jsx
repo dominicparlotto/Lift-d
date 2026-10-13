@@ -3,7 +3,7 @@ import ClipsView from "./ClipsView";
 import { INITIAL_GYMS } from "../data/social";
 import { makeInvite, initials, timeAgo } from "../utils/helpers";
 
-export default function SocialTab({user,posts,updateUser}){
+export default function SocialTab({user,posts,actions}){
   const [liked,setLiked]=useState({});
   const [saved,setSaved]=useState({});
   const [boosted,setBoosted]=useState({});
@@ -16,6 +16,7 @@ export default function SocialTab({user,posts,updateUser}){
   const [messages,setMessages]=useState({general:[{user:"alex_lifts",text:"Morning everyone! Leg day 💪",time:"8:02am"},{user:"sarahfitness",text:"Nice! I'll be in around noon",time:"8:15am"},{user:"musclemike",text:"Anyone want to team up for bench?",time:"9:30am"}],powerlifting:[{user:"biglifts99",text:"Comp is in 3 weeks, who's competing?",time:"7:00am"}],nutrition:[{user:"sarahfitness",text:"Anyone tried high protein overnight oats?",time:"6:45am"}]});
   const [msgInput,setMsgInput]=useState("");
   const [showUpload,setShowUpload]=useState(false);
+  const [posting,setPosting]=useState(false);
   const [uploadCaption,setUploadCaption]=useState("");
   const [uploadFile,setUploadFile]=useState(null);
   const [showAddGym,setShowAddGym]=useState(false);
@@ -36,9 +37,9 @@ export default function SocialTab({user,posts,updateUser}){
   });
 
   function sendMsg(){if(!msgInput.trim())return;setMessages(prev=>({...prev,[activeChannel]:[...(prev[activeChannel]||[]),{user:user?.username||"You",text:msgInput,time:"now"}]}));setMsgInput("");}
-  function submitPost(){if(!uploadCaption.trim())return;updateUser(u=>({posts:[{id:crypto.randomUUID(),content:uploadCaption.trim(),hasVideo:!!uploadFile,createdAt:Date.now(),muscle:"All",skill:"All",equipment:"All"},...u.posts]}));setUploadCaption("");setUploadFile(null);setShowUpload(false);}
-  function toggleFollow(id){updateUser(u=>({following:u.following.includes(id)?u.following.filter(f=>f!==id):[...u.following,id]}));}
-  function toggleSaveClip(id){updateUser(u=>({savedClips:u.savedClips.includes(id)?u.savedClips.filter(c=>c!==id):[...u.savedClips,id]}));}
+  async function submitPost(){if(!uploadCaption.trim()||posting)return;setPosting(true);const ok=await actions.createPost({content:uploadCaption.trim(),hasVideo:!!uploadFile});setPosting(false);if(ok){setUploadCaption("");setUploadFile(null);setShowUpload(false);}}
+  const toggleFollow=id=>actions.toggleFollow(id);
+  const toggleSaveClip=id=>actions.toggleSaveClip(id);
   function addGym(){if(!newGymName.trim())return;const newG={id:Date.now(),name:newGymName,location:newGymLoc||"Unknown",members:1,channels:["general"],invite:makeInvite(newGymName),leaderboard:[{user:user?.username||"you",score:0}]};setGyms(prev=>[...prev,newG]);setNewGymName("");setNewGymLoc("");setShowAddGym(false);}
   function addChannel(){if(!newCh.trim()||!selectedGym)return;const ch=newCh.toLowerCase().replace(/\s+/g,"-");setGyms(prev=>prev.map(g=>g.id===selectedGym.id?{...g,channels:[...g.channels,ch]}:g));setSelectedGym(prev=>({...prev,channels:[...prev.channels,ch]}));setActiveChannel(ch);setNewCh("");setShowAddCh(false);}
 
@@ -137,7 +138,7 @@ export default function SocialTab({user,posts,updateUser}){
             </div>
             );
           })}
-          {showUpload&&<div className="modal-overlay" onClick={()=>setShowUpload(false)}><div className="modal-sheet" onClick={e=>e.stopPropagation()}><div className="modal-handle"/><div className="modal-title">New Post</div><div className="modal-sub">Share a workout clip. Videos must be under 5 minutes.</div><input ref={fileRef} type="file" accept="video/*,image/*" style={{display:"none"}} onChange={e=>setUploadFile(e.target.files[0])}/>{uploadFile?(<div style={{borderRadius:16,overflow:"hidden",height:130,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:14,position:"relative"}}><div style={{fontSize:40}}>🎥</div><div style={{position:"absolute",bottom:10,left:14,fontSize:11,color:"var(--muted)"}}>{uploadFile.name}</div><button onClick={()=>setUploadFile(null)} style={{position:"absolute",top:10,right:12,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:24,height:24,color:"#fff",cursor:"pointer",fontSize:12}}>✕</button></div>):(<div className="upload-area" onClick={()=>fileRef.current.click()}><div style={{fontSize:32,marginBottom:8}}>📹</div><div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Tap to upload video</div><div style={{fontSize:12,color:"var(--muted)"}}>MP4, MOV · max 5 minutes</div></div>)}<textarea className="input-field" placeholder="Write a caption…" value={uploadCaption} onChange={e=>setUploadCaption(e.target.value)} style={{width:"100%",minHeight:80,resize:"none",marginBottom:14}}/><button className="btn" style={{width:"100%"}} onClick={submitPost}>Share Post</button></div></div>}
+          {showUpload&&<div className="modal-overlay" onClick={()=>setShowUpload(false)}><div className="modal-sheet" onClick={e=>e.stopPropagation()}><div className="modal-handle"/><div className="modal-title">New Post</div><div className="modal-sub">Share a workout clip. Videos must be under 5 minutes.</div><input ref={fileRef} type="file" accept="video/*,image/*" style={{display:"none"}} onChange={e=>setUploadFile(e.target.files[0])}/>{uploadFile?(<div style={{borderRadius:16,overflow:"hidden",height:130,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:14,position:"relative"}}><div style={{fontSize:40}}>🎥</div><div style={{position:"absolute",bottom:10,left:14,fontSize:11,color:"var(--muted)"}}>{uploadFile.name}</div><button onClick={()=>setUploadFile(null)} style={{position:"absolute",top:10,right:12,background:"rgba(0,0,0,0.5)",border:"none",borderRadius:"50%",width:24,height:24,color:"#fff",cursor:"pointer",fontSize:12}}>✕</button></div>):(<div className="upload-area" onClick={()=>fileRef.current.click()}><div style={{fontSize:32,marginBottom:8}}>📹</div><div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Tap to upload video</div><div style={{fontSize:12,color:"var(--muted)"}}>MP4, MOV · max 5 minutes</div></div>)}<textarea className="input-field" placeholder="Write a caption…" value={uploadCaption} onChange={e=>setUploadCaption(e.target.value)} style={{width:"100%",minHeight:80,resize:"none",marginBottom:14}}/><button className="btn" style={{width:"100%"}} onClick={submitPost} disabled={posting}>{posting?"Posting…":"Share Post"}</button></div></div>}
         </div>
       )}
     </div>

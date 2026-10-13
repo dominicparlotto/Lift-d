@@ -2,12 +2,11 @@ import { useState } from "react";
 import { FOOD_DB_INIT } from "../data/foodDb";
 import { scaleFood, sumLog, dateKey, initials } from "../utils/helpers";
 
-export default function NutritionTab({user,updateUser,onOpenProfile}){
+export default function NutritionTab({user,actions,onOpenProfile}){
   const [foodDB,setFoodDB]=useState(FOOD_DB_INIT);
-  // Food is saved on the account per day; this tab edits today's entries.
+  // Food is saved to the account per day; this tab shows and edits today's entries.
   const todayKey=dateKey();
   const log=user.food[todayKey]||[];
-  function setLog(fn){updateUser(u=>({food:{...u.food,[todayKey]:fn(u.food[todayKey]||[])}}));}
   const [query,setQuery]=useState(""); const [grams,setGrams]=useState("");
   const [suggestions,setSuggestions]=useState([]); const [selectedFood,setSelectedFood]=useState(null);
   const [goal,setGoal]=useState("maintenance");
@@ -21,9 +20,10 @@ export default function NutritionTab({user,updateUser,onOpenProfile}){
   const maxCal=Math.max(1,...history.map(h=>h.cals));
   function handleQuery(v){setQuery(v);setSelectedFood(null);setSuggestions(v.length<2?[]:Object.keys(foodDB).filter(k=>k.includes(v.toLowerCase())).slice(0,10));}
   function selectFood(name){setSelectedFood(name);setQuery(name.charAt(0).toUpperCase()+name.slice(1));setSuggestions([]);}
-  function addFood(){const g=parseFloat(grams)||100;const key=selectedFood||query.toLowerCase();const food=foodDB[key];if(!food)return;setLog(prev=>[...prev,{id:Date.now(),name:query,grams:g,...scaleFood(food,g)}]);setQuery("");setGrams("");setSelectedFood(null);}
-  function removeFood(id){setLog(prev=>prev.filter(f=>f.id!==id));}
-  function submitNewFood(){if(!newFood.name||!newFood.cal)return;const key=newFood.name.toLowerCase().trim();const entry={cal:+newFood.cal,p:+newFood.p||0,c:+newFood.c||0,f:+newFood.f||0,fi:+newFood.fi||0,cat:"Custom"};setFoodDB(prev=>({...prev,[key]:entry}));const g=parseFloat(grams)||100;setLog(prev=>[...prev,{id:Date.now(),name:newFood.name,grams:g,...scaleFood(entry,g)}]);setNewFood({name:"",cal:"",p:"",c:"",f:"",fi:""});setQuery("");setGrams("");setShowAddFood(false);}
+  const portion=()=>Math.min(5000,Math.max(1,parseFloat(grams)||100));
+  async function addFood(){const g=portion();const key=selectedFood||query.toLowerCase();const food=foodDB[key];if(!food)return;if(await actions.addFood({name:query,grams:g,...scaleFood(food,g)})){setQuery("");setGrams("");setSelectedFood(null);}}
+  function removeFood(id){actions.removeFood(id);}
+  async function submitNewFood(){if(!newFood.name||!newFood.cal)return;const key=newFood.name.toLowerCase().trim();const entry={cal:+newFood.cal,p:+newFood.p||0,c:+newFood.c||0,f:+newFood.f||0,fi:+newFood.fi||0,cat:"Custom"};setFoodDB(prev=>({...prev,[key]:entry}));const g=portion();if(await actions.addFood({name:newFood.name,grams:g,...scaleFood(entry,g)})){setNewFood({name:"",cal:"",p:"",c:"",f:"",fi:""});setQuery("");setGrams("");setShowAddFood(false);}}
   return(
     <div>
       <div className="header"><div><div className="header-title"><span className="liftd-logo">Lift'd</span></div><div className="header-sub">Nutrition · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div></div><button className="avatar-btn" onClick={onOpenProfile} style={{overflow:"hidden",padding:0}}>{user.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials(user.name)}</button></div>
