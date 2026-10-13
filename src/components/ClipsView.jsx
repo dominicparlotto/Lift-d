@@ -8,7 +8,7 @@ const EQUIPMENT=["All","Barbell","Dumbbell","Kettlebell","Machine","Cable","Body
 const fieldLabel={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted)",marginBottom:6};
 
 // Short-form feed: curated learning clips (with on-screen coaching cues) + members' video posts.
-export default function ClipsView({user,actions,clips,onChanged,filterMuscle,filterSkill}){
+export default function ClipsView({user,actions,clips,onChanged,filterMuscle,filterSkill,startKey,onStartHandled}){
   const [idx,setIdx]=useState(0);
   const [liked,setLiked]=useState({});
   const [cueIdx,setCueIdx]=useState(0);
@@ -18,8 +18,7 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
   const [reportTarget,setReportTarget]=useState(null);
   const [blockTarget,setBlockTarget]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
-  const touchStart=useRef(null);
-  const containerRef=useRef(null);
+  const scrollerRef=useRef(null);
   const videoRefs=useRef({});
   const filtered=(clips||[]).filter(c=>{
     if(filterMuscle&&filterMuscle!=="All"&&c.muscle!==filterMuscle&&c.muscle!=="All")return false;
@@ -28,10 +27,48 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
   });
   const current=Math.min(idx,Math.max(0,filtered.length-1));
 
-  const handleWheel=useCallback(e=>{e.preventDefault();if(e.deltaY>30)setIdx(i=>Math.min(i+1,filtered.length-1));else if(e.deltaY<-30)setIdx(i=>Math.max(i-1,0));},[filtered.length]);
-  useEffect(()=>{const el=containerRef.current;if(!el)return;el.addEventListener("wheel",handleWheel,{passive:false});return()=>el.removeEventListener("wheel",handleWheel);},[handleWheel]);
-  const handleTouchStart=e=>touchStart.current=e.touches[0].clientY;
-  const handleTouchEnd=e=>{if(!touchStart.current)return;const dy=touchStart.current-e.changedTouches[0].clientY;if(Math.abs(dy)>50){setIdx(i=>dy>0?Math.min(i+1,filtered.length-1):Math.max(i-1,0));}touchStart.current=null;};
+  const idxRef=useRef(0); idxRef.current=current;
+
+  // Touch: native scroll-snap (styles.css) — the clip follows your finger and every swipe stops on the next clip, like Reels.
+  const onScroll=()=>{const el=scrollerRef.current;if(el&&el.clientHeight)setIdx(Math.round(el.scrollTop/el.clientHeight));};
+  const goTo=useCallback((i,smooth=true)=>{
+    const el=scrollerRef.current;if(!el)return;
+    const n=Math.max(0,Math.min(i,filtered.length-1));
+    el.scrollTo({top:n*el.clientHeight,behavior:smooth?"smooth":"auto"});setIdx(n);
+  },[filtered.length]);
+  // Mouse wheel / trackpad: exactly one clip per gesture. A trackpad flick keeps firing wheel events for
+  // a second or more (momentum), so after one step we ignore the rest until the wheel goes quiet.
+  useEffect(()=>{
+    const el=scrollerRef.current;if(!el)return;
+    const g={last:0,used:false,until:0};
+    const onWheel=e=>{
+      if(Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
+      e.preventDefault();
+      const now=Date.now();
+      if(now-g.last>200)g.used=false; // a pause means a new gesture
+      g.last=now;
+      if(g.used||now<g.until||Math.abs(e.deltaY)<4){g.used=true;return;}
+      g.used=true;g.until=now+450;
+      goTo(idxRef.current+(e.deltaY>0?1:-1));
+    };
+    const onKey=e=>{
+      if(e.key==="ArrowDown"||e.key==="PageDown"){e.preventDefault();goTo(idxRef.current+1);}
+      else if(e.key==="ArrowUp"||e.key==="PageUp"){e.preventDefault();goTo(idxRef.current-1);}
+    };
+    el.addEventListener("wheel",onWheel,{passive:false});
+    el.addEventListener("keydown",onKey);
+    el.focus({preventScroll:true});
+    return ()=>{el.removeEventListener("wheel",onWheel);el.removeEventListener("keydown",onKey);};
+  },[goTo,filtered.length>0]);
+  // New filters → back to the first clip.
+  useEffect(()=>{goTo(0,false);},[filterMuscle,filterSkill]);
+  // Opened from "Watch in Clips" on a Feed post: jump straight to that clip.
+  useEffect(()=>{
+    if(!startKey||!filtered.length)return;
+    const i=filtered.findIndex(c=>c.key===startKey);
+    if(i>=0)goTo(i,false);
+    onStartHandled?.();
+  },[startKey,filtered.length]);
 
   // Play only the clip on screen; pause + rewind the rest.
   useEffect(()=>{
@@ -71,7 +108,7 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
     {menu&&<ActionSheet onClose={()=>setMenu(null)} options={menuFor(menu)}/>}
     {reportTarget&&<ReportSheet target={reportTarget} onReport={actions.report} onBlock={block} onClose={()=>setReportTarget(null)}/>}
     {blockTarget&&<BlockSheet username={blockTarget.username} onConfirm={()=>block(blockTarget.userId)} onClose={()=>setBlockTarget(null)}/>}
-    {showAdd&&<AddClipSheet actions={actions} onClose={()=>setShowAdd(false)} onAdded={()=>{setShowAdd(false);setIdx(0);onChanged();}}/>}
+    {showAdd&&<AddClipSheet actions={actions} onClose={()=>setShowAdd(false)} onAdded={()=>{setShowAdd(false);goTo(0,false);onChanged();}}/>}
   </>;
 
   if(clips===null)return<div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--muted)"}}>Loading clips…</div>;
@@ -86,14 +123,15 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
   );
 
   return(
-    <div ref={containerRef} style={{height:"100%",overflow:"hidden",position:"relative",userSelect:"none"}} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div style={{height:"100%",position:"relative",userSelect:"none",background:"#000"}}>
       {adminBtn}
       <button className="clip-mute" onClick={()=>setMuted(m=>!m)} aria-label={muted?"Turn sound on":"Turn sound off"}>{muted?"🔇":"🔊"}</button>
+      <div ref={scrollerRef} className="clip-scroller" tabIndex={0} onScroll={onScroll} aria-label="Clips — swipe or use the arrow keys for the next one">
       {filtered.map((c,i)=>{
         const saved=user.savedClips.includes(c.key);
         const options=menuFor(c);
         return(
-        <div key={c.key} style={{position:"absolute",inset:0,transform:`translateY(${(i-current)*100}%)`,transition:"transform 0.42s cubic-bezier(.4,0,.2,1)",display:"flex",flexDirection:"column",background:"#000"}}>
+        <div key={c.key} className="clip-slide">
           {Math.abs(i-current)<=1&&<video ref={el=>{if(el)videoRefs.current[c.key]=el;}} src={c.videoUrl} muted={muted} loop playsInline preload={i===current?"auto":"metadata"} onClick={togglePlay} onPlay={()=>{if(i===current)setPaused(false);}} onPause={()=>{if(i===current)setPaused(true);}} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}/>}
           {i===current&&paused&&<button className="clip-play" onClick={togglePlay} aria-label="Play">▶</button>}
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(8,12,24,0.35) 0%,transparent 22%,transparent 55%,rgba(8,12,24,0.6) 100%)",pointerEvents:"none"}}/>
@@ -126,12 +164,13 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>{[c.muscle,c.equipment,c.skill].filter(t=>t&&t!=="All").map(t=><span key={t} style={{padding:"2px 8px",borderRadius:12,background:"rgba(255,255,255,0.12)",fontSize:10,fontWeight:600}}>{t}</span>)}</div>
             {(c.music||c.credit)&&<div style={{display:"flex",alignItems:"center",gap:7,fontSize:11,color:"rgba(238,242,255,0.7)"}}>{c.music&&<><span className="clip-music-note">♪</span><span>{c.music.title}{c.music.source?` · ${c.music.source}`:""}</span></>}{c.music&&c.credit&&<span>·</span>}{c.credit&&<span>{c.credit}</span>}</div>}
           </div>
-          <div style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",display:"flex",flexDirection:"column",gap:5,zIndex:10}}>
-            {filtered.map((_,j)=><div key={j} style={{width:3,borderRadius:2,background:j===current?"#fff":"rgba(255,255,255,0.3)",height:j===current?16:4,transition:"all 0.3s"}}/>)}
-          </div>
         </div>
         );
       })}
+      </div>
+      <div style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",display:"flex",flexDirection:"column",gap:5,zIndex:10,pointerEvents:"none"}}>
+        {filtered.map((_,j)=><div key={j} style={{width:3,borderRadius:2,background:j===current?"#fff":"rgba(255,255,255,0.3)",height:j===current?16:4,transition:"all 0.3s"}}/>)}
+      </div>
       {sheets}
     </div>
   );
