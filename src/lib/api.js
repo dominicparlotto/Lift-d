@@ -239,12 +239,12 @@ const toCuratedClip = c => ({
   key: `clip:${c.id}`, kind: "curated", id: c.id, title: c.title, description: c.description, videoUrl: clipUrl(c.video_path), videoPath: c.video_path,
   cues: c.cues || [], music: c.music_title ? { title: c.music_title, source: c.music_source || "" } : null, credit: c.credit,
   muscle: c.muscle, skill: c.skill, equipment: c.equipment, author: null, createdAt: Date.parse(c.created_at), isPublished: c.is_published,
-  focusX: c.focus_x ?? 50, cuePosition: c.cue_position || "bottom", commentCount: commentCount(c),
+  focusX: c.focus_x ?? 50, cuePosition: c.cue_position || "bottom", exercises: c.exercises || [], commentCount: commentCount(c),
 });
 const toPostClip = p => ({
   key: `post:${p.id}`, kind: "community", id: p.id, title: p.content, description: "", videoUrl: p.mediaUrl, videoPath: p.mediaPath,
   cues: [], music: null, credit: "", muscle: p.muscle, skill: p.skill, equipment: p.equipment, author: p.author, createdAt: p.createdAt,
-  focusX: 50, cuePosition: "bottom", commentCount: p.commentCount,
+  focusX: 50, cuePosition: "bottom", exercises: [], commentCount: p.commentCount,
 });
 export async function loadClips() {
   const [curated, posts] = await Promise.all([
@@ -255,14 +255,14 @@ export async function loadClips() {
   // Learning clips first, then the newest community videos.
   return [...curated.map(toCuratedClip), ...community];
 }
-export async function addCuratedClip({ file, title, description, muscle, skill, equipment, cues, musicTitle, musicSource, credit, focusX = 50, cuePosition = "bottom" }) {
+export async function addCuratedClip({ file, title, description, muscle, skill, equipment, cues, musicTitle, musicSource, credit, focusX = 50, cuePosition = "bottom", exercises = [] }) {
   const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
   const path = `${crypto.randomUUID()}.${ext}`;
   check(await supabase.storage.from("clips").upload(path, file, { contentType: file.type }));
   try {
     const row = check(await supabase.from("clips").insert({
       title, description, muscle, skill, equipment, video_path: path, cues,
-      music_title: musicTitle || null, music_source: musicSource || null, credit: credit || "", focus_x: focusX, cue_position: cuePosition,
+      music_title: musicTitle || null, music_source: musicSource || null, credit: credit || "", focus_x: focusX, cue_position: cuePosition, exercises,
     }).select().single());
     return toCuratedClip(row);
   } catch (e) {
@@ -274,9 +274,12 @@ export async function deleteCuratedClip(id, path) {
   check(await supabase.from("clips").delete().eq("id", id));
   await supabase.storage.from("clips").remove([path]).catch(() => {});
 }
-// Admin: re-frame a clip (horizontal crop + where the coaching cue sits).
-export const updateClipFraming = (id, { focusX, cuePosition }) =>
-  supabase.from("clips").update({ focus_x: focusX, cue_position: cuePosition }).eq("id", id).then(check);
+// Admin: edit a clip's framing (horizontal crop + where the cue sits) and which exercises it teaches.
+export const updateClip = (id, { focusX, cuePosition, exercises }) =>
+  supabase.from("clips").update({ focus_x: focusX, cue_position: cuePosition, exercises }).eq("id", id).then(check);
+// Learning clips only (for the Workout tab's "▶ Form" buttons).
+export const loadLearnClips = () =>
+  supabase.from("clips").select("*").then(check).then(rows => rows.map(toCuratedClip));
 
 // ---------- Comments (on posts and on curated clips) ----------
 // item is a feed post or a clip; curated clips are commented on by clip id, everything else by post id.

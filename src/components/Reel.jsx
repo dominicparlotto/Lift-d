@@ -122,3 +122,33 @@ export function CommentsSheet({item,user,actions,onClose,onCount}){
 export const CommentIcon=({size=22,color="currentColor"})=>(
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg>
 );
+
+// One clip in a pop-up player — e.g. "▶ Form" from the workout log. Same video, crop and cues as Clips.
+export function ClipPlayer({clip,user,actions,onClose}){
+  const [muted,setMuted]=useState(true);
+  const cueIdx=useCue(clip,true);
+  const saved=user.savedClips.includes(clip.key);
+  useEffect(()=>{const onKey=e=>{if(e.key==="Escape")onClose();};document.addEventListener("keydown",onKey);return ()=>document.removeEventListener("keydown",onKey);},[]);
+  return(
+    <div className="modal-overlay player-overlay" onClick={onClose}>
+      <div className="player" onClick={e=>e.stopPropagation()} role="dialog" aria-label={clip.title}>
+        <div className="player-frame">
+          <ReelVideo clip={clip} active muted={muted}/>
+          <div className="reel-frame-shade"/>
+          {clip.cues.length>0&&<div className={clip.cuePosition==="top"?"reel-cue-top":"reel-cue-bottom"} style={clip.cuePosition==="top"?{top:58}:undefined}><CueBadge clip={clip} index={cueIdx}/></div>}
+          <button className="player-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="reel-mute" onClick={()=>setMuted(m=>!m)} aria-label={muted?"Turn sound on":"Turn sound off"}>{muted?"🔇":"🔊"}</button>
+        </div>
+        <div className="player-info">
+          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}}><span className="learn-badge">FORM TIPS</span>Lift'd Learn</div>
+          <div style={{fontSize:15,fontWeight:700,lineHeight:1.35}}>{clip.title}</div>
+          {clip.description&&<div style={{fontSize:13,color:"var(--muted)",marginTop:3,lineHeight:1.45}}>{clip.description}</div>}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:10}}>
+            <button className={`btn btn-sm ${saved?"":"btn-ghost"}`} onClick={()=>actions.toggleSaveClip(clip.key)}>{saved?"🔖 Saved":"🔖 Save for the gym"}</button>
+            {clip.credit&&<span style={{fontSize:11,color:"var(--muted2)"}}>{clip.credit}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

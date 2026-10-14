@@ -220,7 +220,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .pr-exercise{font-size:16px;font-weight:700;margin-bottom:4px;}
 .pr-weight{font-size:36px;font-weight:800;font-family:var(--mono);letter-spacing:-1px;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .pr-delta{font-size:12px;color:var(--accent3);font-weight:600;margin-top:2px;}
-.pr-share-btn{position:absolute;bottom:14px;right:14px;background:var(--grad);border:none;border-radius:10px;padding:7px 14px;color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;}
+.pr-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:14px;position:relative;}
+.pr-share-btn.ghost{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);}
+.pr-share-btn{background:var(--grad);border:none;border-radius:10px;padding:7px 12px;color:#fff;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;}
 /* BADGES */
 .badge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
 .badge-card{background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;transition:all 0.2s;}
@@ -407,3 +409,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .learn-badge{background:linear-gradient(135deg,#2481d7,#4A9EE8);border-radius:5px;padding:2px 6px;font-size:9px;font-weight:800;color:#fff;letter-spacing:0.5px;}
 .clip-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:15;width:68px;height:68px;border-radius:50%;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.45);backdrop-filter:blur(8px);color:#fff;font-size:26px;padding-left:5px;cursor:pointer;}
 .feedback-item{padding:12px;border-radius:14px;background:var(--glass);border:1px solid var(--border);}
+
+/* "▶ Form" on exercises that have a learning clip */
+.form-btn{margin-left:auto;margin-right:8px;padding:5px 10px;border-radius:999px;border:1px solid rgba(62,207,207,0.35);background:rgba(62,207,207,0.1);color:var(--accent3);font-family:var(--font);font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+.form-btn+.custom-ex-remove{margin-left:0;}
+/* Pop-up clip player */
+.player-overlay{align-items:center;padding:16px;}
+.player{width:min(100%,380px);display:flex;flex-direction:column;gap:12px;}
+.player-frame{position:relative;width:100%;aspect-ratio:9/16;max-height:70vh;border-radius:20px;overflow:hidden;background:#000;margin:0 auto;}
+.player-close{position:absolute;top:12px;right:12px;z-index:12;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.5);color:#fff;font-size:14px;cursor:pointer;}
+.player-info{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px;}
+/* Shareable PR card */
+.pr-row-share{width:32px;height:32px;border-radius:10px;border:1px solid var(--border);background:var(--glass);font-size:14px;cursor:pointer;flex-shrink:0;}
+.pr-preview{display:flex;justify-content:center;}
+.pr-preview img{width:min(100%,250px);aspect-ratio:9/16;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.35);}
+:root[data-theme="light"] .pr-card{background:linear-gradient(135deg,#ECEBFF,#E3EEFF);border-color:rgba(79,142,247,0.3);}
+:root[data-theme="light"] .pr-share-btn.ghost{background:rgba(15,23,42,0.06);border-color:rgba(15,23,42,0.12);color:var(--text);}
+:root[data-theme="light"] .profile-banner{background:linear-gradient(135deg,#DCE6FF 0%,#E8E2FF 50%,#D6F0F3 100%);}

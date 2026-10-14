@@ -6,6 +6,7 @@ import { PASSWORD_RULES } from "../utils/validation";
 import { useUsernameStatus } from "./AuthScreen";
 import PasswordInput from "./PasswordInput";
 import { FeedbackSheet, FeedbackInbox } from "./Feedback";
+import PRShareSheet from "./PRShare";
 import { getTheme, setTheme } from "../utils/theme";
 import { BlockedAccountsSheet, DeleteAccountSheet } from "./Moderation";
 import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
@@ -19,6 +20,7 @@ export default function ProfileTab({user,actions}){
   const [notifs,setNotifs]=useState(true);
   const [priv,setPriv]=useState(false);
   const [dark,setDark]=useState(()=>getTheme()==="dark");
+  const [cardPR,setCardPR]=useState(null); // PR being turned into a shareable image
   const [showFeedback,setShowFeedback]=useState(false); const [showInbox,setShowInbox]=useState(false);
   const [units,setUnits]=useState("imperial");
   const [sharedPR,setSharedPR]=useState({});
@@ -70,14 +72,14 @@ export default function ProfileTab({user,actions}){
         {prs.length===0?(
           <div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🏆</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No PRs yet</div><div style={{fontSize:12}}>Log a workout and your best lift on each exercise shows up here.</div></div>
         ):(<>
-          <div style={{padding:"0 16px 12px",fontSize:13,color:"var(--muted)"}}>Your heaviest set on each lift. Tap Share to post it to your feed.</div>
+          <div style={{padding:"0 16px 12px",fontSize:13,color:"var(--muted)"}}>Your heaviest set on each lift. Share it to your story or post it to your feed.</div>
           {prs.map(pr=>(
             <div key={pr.exercise} className="pr-card">
               <div className="pr-title">🏆 PERSONAL RECORD</div>
               <div className="pr-exercise">{pr.exercise}</div>
               <div className="pr-weight">{pr.weight}<span style={{fontSize:20,fontWeight:600}}> lbs</span> <span style={{fontSize:16,fontWeight:600,color:"var(--muted)"}}>× {pr.reps}</span></div>
               <div className="pr-delta">{pr.dateKey===todayKey?"Today":shortDate(pr.dateKey)}</div>
-              <div style={{marginTop:14}}><button className="pr-share-btn" disabled={!!sharedPR[pr.exercise]} onClick={()=>sharePR(pr)}>{sharedPR[pr.exercise]==="done"?"✓ Shared!":sharedPR[pr.exercise]==="sending"?"Sharing…":"📤 Share to Feed"}</button></div>
+              <div className="pr-actions"><button className="pr-share-btn ghost" onClick={()=>setCardPR(pr)}>📸 Story</button><button className="pr-share-btn" disabled={!!sharedPR[pr.exercise]} onClick={()=>sharePR(pr)}>{sharedPR[pr.exercise]==="done"?"✓ Shared!":sharedPR[pr.exercise]==="sending"?"Sharing…":"📤 Share to Feed"}</button></div>
             </div>
           ))}
         </>)}
@@ -114,6 +116,7 @@ export default function ProfileTab({user,actions}){
         <div style={{padding:"0 16px 32px"}}><button className="btn-danger" onClick={()=>setShowDelete(true)}>Delete Account</button></div>
       </div>)}
 
+      {cardPR&&<PRShareSheet pr={cardPR} user={user} actions={actions} onClose={()=>setCardPR(null)}/>}
       {showFeedback&&<FeedbackSheet actions={actions} onClose={()=>setShowFeedback(false)}/>}
       {showInbox&&<FeedbackInbox actions={actions} onClose={()=>setShowInbox(false)}/>}
       {showEdit&&<EditProfileModal user={user} onClose={()=>setShowEdit(false)} onSave={async(fields,avatar)=>{if(await actions.updateProfile(fields,avatar))setShowEdit(false);}}/>}

@@ -1,6 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { WORKOUTS } from "../data/workouts";
 import WhoIsTraining from "./WhoIsTraining";
+import { ClipPlayer } from "./Reel";
+import PRShareSheet from "./PRShare";
+import * as api from "../lib/api";
 import { dateKey, shortDate, currentWeek, setVolume, bestSets } from "../utils/helpers";
 
 
@@ -17,6 +20,12 @@ export default function WorkoutTab({user,actions}){
   const [prPage,setPrPage]=useState(0);
   const [saving,setSaving]=useState(false);
   const carouselRef=useRef(null);
+  // Learning clips linked to exercises → "▶ Form" buttons in the log.
+  const [learnClips,setLearnClips]=useState(null);
+  const [playing,setPlaying]=useState(null); // clip open in the pop-up player
+  const [sharePR,setSharePR]=useState(null); // PR being turned into a shareable card
+  useEffect(()=>{if(view==="log"&&learnClips===null)api.loadLearnClips().then(setLearnClips).catch(e=>{console.error(e);setLearnClips([]);});},[view]);
+  const formClip=name=>(learnClips||[]).find(c=>c.exercises.includes(name));
   // Workouts are saved to the account, keyed by date ("2026-10-11" → exercises done that day).
   const workouts=user.workouts;
   const todayKey=dateKey();
@@ -83,7 +92,7 @@ export default function WorkoutTab({user,actions}){
   const focusLabel=openDay===todayKey?"Today":openDay?week.find(d=>d.key===openDay)?.label:"";
 
   // Personal records — heaviest set per exercise across everything the user has logged
-  const records=Object.entries(bestSets(workouts)).map(([exercise,b])=>({exercise,weight:b.weight,reps:b.reps,date:b.dateKey===todayKey?"Today":shortDate(b.dateKey),isNewPR:b.dateKey===todayKey})).sort((a,b)=>b.weight-a.weight);
+  const records=Object.entries(bestSets(workouts)).map(([exercise,b])=>({exercise,weight:b.weight,reps:b.reps,dateKey:b.dateKey,date:b.dateKey===todayKey?"Today":shortDate(b.dateKey),isNewPR:b.dateKey===todayKey})).sort((a,b)=>b.weight-a.weight);
   const PR_PAGE_SIZE=5;
   const prPageCount=Math.max(1,Math.ceil(records.length/PR_PAGE_SIZE));
   const clampedPrPage=Math.min(prPage,prPageCount-1);
@@ -187,9 +196,12 @@ export default function WorkoutTab({user,actions}){
                 {pagedRecords.map(r=>(
                   <div key={r.exercise} className="food-item">
                     <div><div className="food-name">{r.exercise}</div><div className="food-amount">{r.date}</div></div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontWeight:800,color:r.isNewPR?"var(--accent3)":"var(--text)"}}>{r.weight}lbs × {r.reps}</div>
-                      {r.isNewPR&&<div style={{fontSize:10,color:"var(--accent3)",fontWeight:700}}>NEW PR 🎉</div>}
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontWeight:800,color:r.isNewPR?"var(--accent3)":"var(--text)"}}>{r.weight}lbs × {r.reps}</div>
+                        {r.isNewPR&&<div style={{fontSize:10,color:"var(--accent3)",fontWeight:700}}>NEW PR 🎉</div>}
+                      </div>
+                      <button className="pr-row-share" onClick={()=>setSharePR({exercise:r.exercise,weight:r.weight,reps:r.reps,dateKey:r.dateKey})} aria-label={`Share ${r.exercise} PR`}>📤</button>
                     </div>
                   </div>
                 ))}
@@ -219,15 +231,18 @@ export default function WorkoutTab({user,actions}){
             <div key={ex}>
               <div className={`exercise-row ${selectedEx===ex?"selected":""}`} onClick={()=>{setSelectedEx(selectedEx===ex?null:ex);setConfirmRemove(null);}}>
                 <div style={{minWidth:0}}><div className="exercise-name">{ex}{mine&&<span className="custom-ex-tag">Yours</span>}</div><div className="exercise-sets">{getSets(ex).filter(s=>s.weight).length} sets logged</div></div>
+                {formClip(ex)&&<button className="form-btn" onClick={e=>{e.stopPropagation();setPlaying(formClip(ex));}} aria-label={`Watch ${ex} form clip`}>▶ Form</button>}
                 {mine&&<button className={`custom-ex-remove ${confirmRemove===mine.id?"confirm":""}`} onClick={e=>{e.stopPropagation();removeExercise(mine);}}>{confirmRemove===mine.id?"Remove?":"✕"}</button>}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><polyline points={selectedEx===ex?"18 15 12 9 6 15":"6 9 12 15 18 9"}/></svg>
               </div>
-              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" inputMode="decimal" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
+              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><div style={{display:"flex",gap:6}}>{formClip(ex)&&<button className="add-set-btn" onClick={()=>setPlaying(formClip(ex))}>▶ Form</button>}<button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" inputMode="decimal" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
             </div>
           );})}
           {exercises.length===0&&<div style={{padding:"24px 20px",textAlign:"center",color:"var(--muted)",fontSize:14}}>No exercises found for "{exSearch}" — add it above.</div>}
         </div>
       )}
+      {playing&&<ClipPlayer clip={playing} user={user} actions={actions} onClose={()=>setPlaying(null)}/>}
+      {sharePR&&<PRShareSheet pr={sharePR} user={user} actions={actions} onClose={()=>setSharePR(null)}/>}
     </div>
   );
 }

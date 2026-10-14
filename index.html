@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lift'd — Find Your Gym Crew | Gym Community &amp; Workout Clips</title>
-    <meta name="description" content="Stop lifting alone. Lift'd gives your gym its own community: see who's training now, find gym buddies, learn from short clips, and post your PRs. Free." />
+    <meta name="description" content="Learn proper gym form from short clips filtered to your level, log your lifts, post your PRs, and connect with the people at your gym. Free, beginner-friendly." />
     <link rel="canonical" href="https://joinliftd.com/" />
     <!-- Google Search Console ownership verification -->
     <meta name="google-site-verification" content="y0siNEIyiPphdUtBZZJhotXIbeI3lOD7ykhuzaxPVpg" />
@@ -28,7 +28,7 @@
     <script type="application/ld+json">
     [
       {"@context":"https://schema.org","@type":"WebSite","name":"Lift'd","alternateName":"Liftd","url":"https://joinliftd.com/"},
-      {"@context":"https://schema.org","@type":"WebApplication","name":"Lift'd","url":"https://joinliftd.com/","applicationCategory":"HealthApplication","operatingSystem":"Any (web browser)","browserRequirements":"Requires JavaScript","description":"Gym community app: every gym gets its own space to chat, see who's training right now, and find workout buddies, plus short clips to learn exercise form and one-tap posts to share your PRs.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+      {"@context":"https://schema.org","@type":"WebApplication","name":"Lift'd","url":"https://joinliftd.com/","applicationCategory":"HealthApplication","operatingSystem":"Any (web browser)","browserRequirements":"Requires JavaScript","description":"Learn exercise form from short clips filtered by level, muscle and equipment; log your lifts and share your PRs; and connect with your gym's community to see who's training and find workout buddies.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
     ]
     </script>
 
@@ -117,6 +117,26 @@
       .step::before{counter-increment:step;content:counter(step);display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:var(--grad);font-weight:800;margin-bottom:16px;}
       .step p{color:var(--muted);font-size:15px;}
 
+      /* "New to the gym?" section */
+      .learn{display:grid;grid-template-columns:1.15fr 0.85fr;gap:56px;align-items:center;}
+      .learn-points{display:grid;gap:14px;}
+      .learn-point{display:flex;gap:16px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:20px;}
+      .learn-point .f-icon{margin-bottom:0;flex-shrink:0;}
+      .learn-point p{color:var(--muted);font-size:15px;}
+      .clip-screen{padding:14px 12px 12px;}
+      .chips{display:flex;gap:6px;margin-bottom:10px;}
+      .chip{font-size:10px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted);}
+      .chip.on{background:rgba(79,142,247,0.16);border-color:rgba(79,142,247,0.45);color:var(--accent);}
+      .clip-mock{position:relative;aspect-ratio:9/14;border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#24305c 0%,#0b1022 70%);}
+      .clip-figure{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);font-size:84px;filter:drop-shadow(0 10px 30px rgba(0,0,0,0.5));}
+      .clip-cue-mock{position:absolute;left:12px;right:52px;bottom:92px;background:rgba(8,12,24,0.6);border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:7px 10px;font-size:12px;font-weight:700;line-height:1.35;}
+      .clip-cue-mock b{color:var(--accent3);font-size:9px;letter-spacing:.5px;margin-right:5px;}
+      .clip-cap{position:absolute;left:0;right:48px;bottom:0;padding:12px;background:linear-gradient(to top,rgba(8,12,24,0.92),transparent);}
+      .clip-who{font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+      .clip-title{font-size:12px;font-weight:700;line-height:1.35;}
+      .learn-badge{background:linear-gradient(135deg,#2481d7,#4A9EE8);border-radius:5px;padding:2px 6px;font-size:8px;font-weight:800;color:#fff;letter-spacing:.5px;}
+      .clip-rail{position:absolute;right:10px;bottom:20px;display:flex;flex-direction:column;gap:12px;font-size:16px;}
+      .clip-rail span{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;}
       .faq{max-width:780px;display:grid;gap:12px;}
       details{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 22px;}
       details[open]{border-color:rgba(79,142,247,0.35);}
@@ -141,6 +161,7 @@
       @media (max-width:900px){
         .hero{padding:56px 0 48px;}
         .hero .wrap{grid-template-columns:1fr;gap:48px;}
+        .learn{grid-template-columns:1fr;gap:40px;}
         .nav-links a:not(.btn){display:none;}
         section{padding:60px 0;}
       }
@@ -153,6 +174,7 @@
         <a class="brand" href="./" aria-label="Lift'd home"><img class="brand-mark" src="/favicon.svg" alt="" width="36" height="36" />Lift'd</a>
         <nav class="nav-links" aria-label="Main">
           <a href="#features">Features</a>
+          <a href="#learn">New to the gym?</a>
           <a href="#how-it-works">How it works</a>
           <a href="#faq">FAQ</a>
           <a class="btn btn-primary btn-sm" href="app/#signin">Open the app</a>
@@ -168,7 +190,7 @@
           <div>
             <div class="eyebrow">● Free · Made for your gym</div>
             <h1 id="hero-title">Stop lifting alone in a gym full of people. <span class="grad-text">Find your crew.</span></h1>
-            <p class="lead">Lift'd gives your gym its own community. See who's training right now, chat with members, pick up form tips from short clips between sets, and post your PRs for the people who were there to see them.</p>
+            <p class="lead">Learn proper form from short clips filtered to your level, log every lift, and post your PRs. Then grow with the people at your gym: see who's training right now and turn familiar faces into a crew.</p>
             <div class="cta-row">
               <a class="btn btn-primary" href="app/#signup">Find your gym — it's free</a>
               <a class="btn btn-ghost" href="app/#signin">Sign in</a>
@@ -255,6 +277,35 @@
         </div>
       </section>
 
+      <section id="learn" aria-labelledby="learn-title">
+        <div class="wrap learn">
+          <div>
+            <div class="section-head" style="margin-bottom:28px">
+              <div class="kicker">New to the gym? Start here</div>
+              <h2 id="learn-title">Walk in knowing what to do</h2>
+              <p>The hardest part of the gym is not knowing where to start. Lift'd shows you how, one short clip at a time, then helps you track the progress you make.</p>
+            </div>
+            <div class="learn-points">
+              <div class="learn-point"><div class="f-icon">🎯</div><div><h3>Learn the right form</h3><p>Short clips with on-screen coaching cues show you how to set up and move, so you lift safely from day one. Exercises with a clip have a ▶ Form button right in your workout log.</p></div></div>
+              <div class="learn-point"><div class="f-icon">🧭</div><div><h3>Find workouts for you</h3><p>Filter clips by level, muscle group, and equipment. Only see what fits you, whether it's your first week or your fifth year.</p></div></div>
+              <div class="learn-point"><div class="f-icon">🏆</div><div><h3>Track and share your PRs</h3><p>Log every set and Lift'd spots your personal records automatically. Share a PR card to your Instagram story, or post it for your gym to see.</p></div></div>
+            </div>
+          </div>
+
+          <div class="phone" role="img" aria-label="Lift'd clip showing a beginner chest press with an on-screen coaching cue and level filters">
+            <div class="screen clip-screen" aria-hidden="true">
+              <div class="chips"><span class="chip on">Beginner</span><span class="chip">Chest</span><span class="chip">Machine</span></div>
+              <div class="clip-mock">
+                <div class="clip-figure">🏋️</div>
+                <div class="clip-cue-mock"><b>CUE 2/4</b> Press out, then control the way back</div>
+                <div class="clip-cap"><div class="clip-who"><span class="learn-badge">FORM TIPS</span> Lift'd Learn</div><div class="clip-title">Chest press machine: your first press</div></div>
+                <div class="clip-rail"><span>♡</span><span>💬</span><span>🔖</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="faq" aria-labelledby="faq-title">
         <div class="wrap">
           <div class="section-head">
@@ -265,7 +316,9 @@
             <details><summary>Is Lift'd free?</summary><p>Yes, completely. Create an account, join your gym, and start connecting in under a minute.</p></details>
             <details><summary>Do I need to download an app?</summary><p>No. Lift'd runs in your browser on any phone or computer. On iPhone, open it in Safari and tap Share → Add to Home Screen for an app icon. Native iPhone and Android apps are on the way.</p></details>
             <details><summary>My gym isn't on Lift'd yet. Now what?</summary><p>Start it! Add your gym in a few seconds and you'll get an invite link to share wherever your gym's people already are: group chats, Instagram, or the folks you see every day. Every gym's community starts with one founding member.</p></details>
-            <details><summary>I'm new to lifting. Is Lift'd for me?</summary><p>Definitely. Short clips show you how to do each lift, you can filter them to beginner level, and your gym's community is a place to ask questions and find someone to train with.</p></details>
+            <details><summary>I've never really been to a gym. Is Lift'd for me?</summary><p>Yes — that's who we built it for first. Filter clips to beginner level to learn the basics, check a lift's form right from your workout log before you try it, and log your sets so you can see yourself getting stronger week to week. When you're ready, your gym's community is a place to ask questions and find someone to train with.</p></details>
+            <details><summary>How do I know I'm doing an exercise right?</summary><p>Watch the exercise's form clip before your set. Each one has short coaching cues on screen, like where to set your feet or how far to lower the weight. Start light, focus on the cues, and add weight once the movement feels smooth. If something hurts (not just hard work), stop and ask a trainer at your gym.</p></details>
+            <details><summary>Can I share my PRs outside Lift'd?</summary><p>Yes. Every personal record can be turned into a story-sized PR card you can share to Instagram, TikTok, or your group chats, or post to your gym's feed on Lift'd.</p></details>
             <details><summary>Is my information private and safe?</summary><p>Your workouts and food log are private to you. Your profile, posts, and gym chat are visible to signed-in members, and you can report or block anyone in a tap.</p></details>
           </div>
         </div>

@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as api from "../lib/api";
 import { SKILL_TAGS } from "../data/social";
+import { WORKOUTS } from "../data/workouts";
 import { Sheet, ActionSheet, ReportSheet, BlockSheet, Avatar } from "./Moderation";
 import { ReelVideo, useCue, CueBadge, CommentIcon } from "./Reel";
 
 const MUSCLES=["All","Chest","Back","Legs","Shoulders","Arms","Core","Glutes","Cardio","Full Body"];
 const EQUIPMENT=["All","Barbell","Dumbbell","Kettlebell","Machine","Cable","Bodyweight","Bands","None"];
+const ALL_EXERCISES=[...new Set(Object.values(WORKOUTS).flat())].sort();
 const fieldLabel={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted)",marginBottom:6};
 
 // Short-form feed: curated learning clips (with on-screen coaching cues) + members' video posts.
@@ -73,7 +75,7 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
 
   function menuFor(c){
     if(c.kind==="curated")return user.isAdmin?[
-      {icon:"🖼️",label:"Adjust framing",onSelect:()=>setFraming(c)},
+      {icon:"🖼️",label:"Edit clip (framing & exercises)",onSelect:()=>setFraming(c)},
       {icon:"🗑️",label:"Delete clip",danger:true,onSelect:async()=>{try{await api.deleteCuratedClip(c.id,c.videoPath);onChanged();}catch(e){console.error(e);actions.flash("Couldn't delete the clip.");}}},
     ]:[];
     if(c.author?.id===user.id)return[{icon:"🗑️",label:"Delete post",danger:true,onSelect:async()=>{if(await actions.deletePost(c.id))onChanged();}}];
@@ -184,20 +186,38 @@ function FramingPicker({videoUrl,focusX,cuePosition,onChange}){
   );
 }
 
-// Admin-only: re-frame an existing learning clip.
+// Which workout-log exercises a clip teaches — those exercises get a "▶ Form" button in the Workout tab.
+function ExercisePicker({value,onChange}){
+  const [q,setQ]=useState("");
+  const add=name=>{const match=ALL_EXERCISES.find(e=>e.toLowerCase()===name.trim().toLowerCase());if(match&&!value.includes(match))onChange([...value,match]);setQ("");};
+  const suggestions=q.trim().length>=2?ALL_EXERCISES.filter(e=>e.toLowerCase().includes(q.trim().toLowerCase())&&!value.includes(e)).slice(0,6):[];
+  return(
+    <div>
+      <div style={fieldLabel}>Teaches these exercises</div>
+      {value.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{value.map(e=><button key={e} type="button" className="filter-pill active" onClick={()=>onChange(value.filter(x=>x!==e))}>{e} ✕</button>)}</div>}
+      <input className="input-field" style={{width:"100%"}} placeholder="Search the exercise list…" value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();add(suggestions[0]||q);}}}/>
+      {suggestions.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>{suggestions.map(e=><button key={e} type="button" className="filter-pill" onClick={()=>add(e)}>+ {e}</button>)}</div>}
+      <div className="field-hint">These exercises show a ▶ Form button in everyone's workout log.</div>
+    </div>
+  );
+}
+
+// Admin-only: edit an existing learning clip's framing and linked exercises.
 function FramingSheet({clip,actions,onClose,onSaved}){
   const [f,setF]=useState({focusX:clip.focusX??50,cuePosition:clip.cuePosition||"bottom"});
+  const [exercises,setExercises]=useState(clip.exercises||[]);
   const [busy,setBusy]=useState(false);
   async function save(){
     setBusy(true);
-    try{await api.updateClipFraming(clip.id,f);onSaved();}
-    catch(e){console.error(e);actions.flash("Couldn't save the framing — try again.");setBusy(false);}
+    try{await api.updateClip(clip.id,{...f,exercises});onSaved();}
+    catch(e){console.error(e);actions.flash("Couldn't save the clip — try again.");setBusy(false);}
   }
   return(
     <Sheet onClose={busy?undefined:onClose}>
-      <div className="modal-title">Adjust framing</div>
+      <div className="modal-title">Edit clip</div>
       <div className="modal-sub">{clip.title}</div>
       <FramingPicker videoUrl={clip.videoUrl} {...f} onChange={setF}/>
+      <div style={{marginTop:16}}><ExercisePicker value={exercises} onChange={setExercises}/></div>
       <button className="btn" style={{width:"100%",marginTop:16}} onClick={save} disabled={busy}>{busy?"Saving…":"Save"}</button>
     </Sheet>
   );
@@ -206,7 +226,7 @@ function FramingSheet({clip,actions,onClose,onSaved}){
 // Admin-only: add a curated learning clip (video + coaching cues).
 function AddClipSheet({actions,onAdded,onClose}){
   const [file,setFile]=useState(null); const [preview,setPreview]=useState(null);
-  const [form,setForm]=useState({title:"",description:"",muscle:"All",skill:"All",equipment:"All",cues:"",credit:"",focusX:50,cuePosition:"bottom"});
+  const [form,setForm]=useState({title:"",description:"",muscle:"All",skill:"All",equipment:"All",cues:"",credit:"",focusX:50,cuePosition:"bottom",exercises:[]});
   const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
   const fileRef=useRef();
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -224,7 +244,7 @@ function AddClipSheet({actions,onAdded,onClose}){
     setBusy(true);setErr("");
     try{
       await api.addCuratedClip({file,title:form.title.trim(),description:form.description.trim(),muscle:form.muscle,skill:form.skill,equipment:form.equipment,
-        cues:form.cues.split("\n").map(c=>c.trim()).filter(Boolean).slice(0,8),credit:form.credit.trim(),focusX:form.focusX,cuePosition:form.cuePosition});
+        cues:form.cues.split("\n").map(c=>c.trim()).filter(Boolean).slice(0,8),credit:form.credit.trim(),focusX:form.focusX,cuePosition:form.cuePosition,exercises:form.exercises});
       onAdded();
     }catch(e){console.error(e);setErr("Couldn't add the clip — check your connection and try again.");setBusy(false);}
   }
@@ -245,6 +265,7 @@ function AddClipSheet({actions,onAdded,onClose}){
           <div><div style={fieldLabel}>Equipment</div><select className="input-field" style={{width:"100%"}} value={form.equipment} onChange={e=>set("equipment",e.target.value)}>{EQUIPMENT.map(m=><option key={m}>{m}</option>)}</select></div>
         </div>
         <div><div style={fieldLabel}>Coaching cues (one per line)</div><textarea className="input-field" style={{width:"100%",minHeight:96,resize:"vertical"}} placeholder={"Soft bend in the elbows\nSqueeze your chest at the middle\nControl the way back"} value={form.cues} onChange={e=>set("cues",e.target.value)}/></div>
+        <ExercisePicker value={form.exercises} onChange={v=>set("exercises",v)}/>
         <div><div style={fieldLabel}>Video credit</div><input className="input-field" style={{width:"100%"}} maxLength={120} placeholder="e.g. Video: Mixkit" value={form.credit} onChange={e=>set("credit",e.target.value)}/></div>
       </div>
       <button className="btn" style={{width:"100%"}} onClick={save} disabled={busy}>{busy?"Uploading…":"Add clip"}</button>
