@@ -11,7 +11,10 @@ export const WORKOUTS = {
   "Stretch":["Hip Flexor Stretch","Pigeon Pose","Hamstring Stretch","Quad Stretch","Calf Stretch","Chest Opener","Thoracic Rotation","Childs Pose","Downward Dog","Cat-Cow","Worlds Greatest Stretch","90/90 Hip Stretch","Couch Stretch","Foam Roll Quads","Foam Roll IT Band","Arm Circles","Foam Roll Upper Back"],
 };
 
-// Running exercises are logged as distance + time ({miles, minutes}) instead of weight × reps;
-// they count toward each gym's "miles run" leaderboard.
-export const DISTANCE_EXERCISES=new Set(["Running Treadmill","Running Outdoor","Sprint Intervals"]);
+// Distance cardio is logged as miles + minutes ({miles, minutes}) instead of weight × reps.
+// Only the running ones count toward each gym's "Miles run" leaderboard (gym_leaderboards RPC uses the same list).
+export const RUNNING_EXERCISES=new Set(["Running Treadmill","Running Outdoor","Sprint Intervals"]);
+export const DISTANCE_EXERCISES=new Set([...RUNNING_EXERCISES,"Cycling Stationary","Cycling Outdoor","Elliptical"]);
 export const isDistance=name=>DISTANCE_EXERCISES.has(name);
+// What one distance entry is called in the logger: "Run", "Ride" or "Session".
+export const distanceLabel=name=>RUNNING_EXERCISES.has(name)?"Run":/cycling/i.test(name)?"Ride":"Session";

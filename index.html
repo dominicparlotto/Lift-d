@@ -76,25 +76,6 @@
       .s-sub{font-size:11px;color:var(--muted2);margin-bottom:14px;}
       .s-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px;}
       .s-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted2);margin-bottom:9px;}
-      .days{display:flex;gap:5px;}
-      .day{flex:1;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);text-align:center;padding:6px 0 5px;font-size:9px;font-weight:700;color:var(--muted2);}
-      .day b{display:block;font-size:13px;color:var(--text);}
-      .day i{display:block;width:4px;height:4px;border-radius:50%;margin:3px auto 0;background:transparent;}
-      .day.on i{background:var(--accent3);}
-      .day.sel{background:var(--grad);border-color:transparent;color:rgba(255,255,255,0.85);}
-      .day.sel i{background:#fff;}
-      .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px;}
-      .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px;}
-      .stat b{display:block;font-size:18px;font-weight:800;color:var(--accent);font-family:ui-monospace,Menlo,monospace;}
-      .stat span{font-size:8px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);}
-      .ex-name{font-size:14px;font-weight:800;margin-bottom:2px;}
-      .ex-meta{font-size:10px;color:var(--accent3);font-weight:600;margin-bottom:8px;}
-      .setl{display:flex;justify-content:space-between;font-size:11px;padding:6px 0;border-top:1px solid var(--border);}
-      .setl span{color:var(--muted2);font-weight:700;font-size:9px;letter-spacing:.5px;text-transform:uppercase;}
-      .setl b{font-weight:700;}
-      .pr{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(255,140,0,0.12),rgba(255,80,80,0.08));border:1px solid rgba(255,140,0,0.28);border-radius:14px;padding:10px 12px;}
-      .pr .t{font-size:9px;font-weight:800;letter-spacing:1px;color:#FF9F43;}
-      .pr .v{font-size:13px;font-weight:800;}
 
       /* Sections */
       section{padding:80px 0;position:relative;}
@@ -127,11 +108,35 @@
       .chips{display:flex;gap:6px;margin-bottom:10px;}
       .chip{font-size:10px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted);}
       .chip.on{background:rgba(79,142,247,0.16);border-color:rgba(79,142,247,0.45);color:var(--accent);}
-      .clip-mock{position:relative;aspect-ratio:9/14;border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#24305c 0%,#0b1022 70%);}
-      .clip-figure{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);font-size:84px;filter:drop-shadow(0 10px 30px rgba(0,0,0,0.5));}
-      .clip-cue-mock{position:absolute;left:12px;right:52px;bottom:92px;background:rgba(8,12,24,0.6);border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:7px 10px;font-size:12px;font-weight:700;line-height:1.35;}
+      .clip-mock{position:relative;flex:1;min-height:0;border-radius:20px;overflow:hidden;background:#0b1022;}
+      .clip-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+      .clip-mute{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;}
+      .clip-credit{font-size:9px;color:rgba(238,242,255,0.6);margin-top:4px;}
+      /* Both phone mockups share one size */
+      .screen.chat-screen,.screen.clip-screen{aspect-ratio:9/17.5;display:flex;flex-direction:column;}
+      /* Gym chat mockup */
+      .chat-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+      .chat-back{font-size:24px;line-height:1;color:var(--accent);}
+      .chat-chips{display:flex;gap:6px;margin-bottom:10px;}
+      .chat-chips span{font-size:10px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted);}
+      .chat-chips span.on{background:rgba(79,142,247,0.16);border-color:rgba(79,142,247,0.45);color:var(--accent);}
+      .msgs{flex:1;display:flex;flex-direction:column;gap:9px;overflow:hidden;}
+      .msg{display:flex;gap:7px;align-items:flex-end;max-width:88%;}
+      .msg .av{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:800;color:#fff;}
+      .msg b{display:block;font-size:9px;color:var(--muted2);margin:0 0 2px 4px;font-weight:700;}
+      .msg p{background:var(--card);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:7px 10px;font-size:11.5px;line-height:1.35;}
+      .msg.me{align-self:flex-end;}
+      .msg.me p{background:var(--grad);border:none;border-radius:14px 14px 4px 14px;color:#fff;}
+      .sys{align-self:center;font-size:9.5px;font-weight:700;color:var(--accent3);background:rgba(62,207,207,0.1);border:1px solid rgba(62,207,207,0.25);border-radius:999px;padding:3px 10px;}
+      .typing{display:flex;align-items:center;gap:3px;font-size:9.5px;color:var(--muted2);margin-left:31px;}
+      .typing span{width:5px;height:5px;border-radius:50%;background:var(--muted2);animation:typing 1.2s infinite;}
+      .typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s;margin-right:4px}
+      @keyframes typing{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-2px)}}
+      .chat-input{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:9px 12px;border-radius:14px;background:var(--card);border:1px solid var(--border);font-size:11px;color:var(--muted2);}
+      .chat-input b{color:var(--accent);font-size:13px;}
+      .clip-cue-mock{display:inline-block;margin-bottom:8px;background:rgba(8,12,24,0.6);border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:6px 9px;font-size:11.5px;font-weight:700;line-height:1.35;}
       .clip-cue-mock b{color:var(--accent3);font-size:9px;letter-spacing:.5px;margin-right:5px;}
-      .clip-cap{position:absolute;left:0;right:48px;bottom:0;padding:12px;background:linear-gradient(to top,rgba(8,12,24,0.92),transparent);}
+      .clip-cap{position:absolute;left:0;right:48px;bottom:0;padding:40px 12px 12px;background:linear-gradient(to top,rgba(8,12,24,0.92) 40%,transparent);}
       .clip-who{font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
       .clip-title{font-size:12px;font-weight:700;line-height:1.35;}
       .learn-badge{background:linear-gradient(135deg,#2481d7,#4A9EE8);border-radius:5px;padding:2px 6px;font-size:8px;font-weight:800;color:#fff;letter-spacing:.5px;}
@@ -198,30 +203,23 @@
             <p class="fine">No download needed · Works on iPhone, Android, and desktop</p>
           </div>
 
-          <div class="phone" role="img" aria-label="Lift'd gym screen showing who's training now, a gym chat thread, and a PR shared with the crew">
-            <div class="screen" aria-hidden="true">
-              <div class="s-title">Iron Valley Gym</div>
-              <div class="s-sub">🟢 6 people training now</div>
-              <div class="s-card">
-                <div class="s-label">Your training week</div>
-                <div class="days">
-                  <div class="day on">M<b>5</b><i></i></div><div class="day on">T<b>6</b><i></i></div><div class="day">W<b>7</b><i></i></div><div class="day on">T<b>8</b><i></i></div><div class="day sel">F<b>9</b><i></i></div><div class="day">S<b>10</b><i></i></div><div class="day">S<b>11</b><i></i></div>
-                </div>
+          <div class="phone" role="img" aria-label="Lift'd gym chat: members of Iron Valley Gym planning to meet for leg day at 6, one checks in and another says they're on the way">
+            <div class="screen chat-screen" aria-hidden="true">
+              <div class="chat-head">
+                <span class="chat-back">‹</span>
+                <div><div class="s-title" style="font-size:17px">Iron Valley Gym</div><div class="s-sub" style="margin-bottom:0">🟢 6 training now · 🏆 #2 this week</div></div>
               </div>
-              <div class="stats">
-                <div class="stat"><b>6</b><span>Here now</span></div>
-                <div class="stat"><b>3</b><span>Friends</span></div>
-                <div class="stat"><b>#2</b><span>Leaderboard</span></div>
+              <div class="chat-chips"><span class="on">#general</span><span>#leg-day</span><span>#6am-crew</span></div>
+              <div class="msgs">
+                <div class="msg"><i class="av" style="background:linear-gradient(135deg,#FF7A6E,#C084FC)">M</i><div><b>@maya</b><p>Anyone hitting legs tonight? 🦵</p></div></div>
+                <div class="msg"><i class="av" style="background:linear-gradient(135deg,#3ECFCF,#4F8EF7)">J</i><div><b>@jordan</b><p>I'm in. 6:00 at the squat racks?</p></div></div>
+                <div class="sys">🟢 @sam checked in · Legs day</div>
+                <div class="msg"><i class="av" style="background:linear-gradient(135deg,#FFB86B,#FF7A6E)">S</i><div><b>@sam</b><p>Just got here, I'll grab us a rack 🙌</p></div></div>
+                <div class="msg me"><div><p>On my way! Save me a spot 💪</p></div></div>
+                <div class="msg"><i class="av" style="background:linear-gradient(135deg,#FF7A6E,#C084FC)">M</i><div><b>@maya</b><p>See you there. First time doing front squats, help 😅</p></div></div>
+                <div class="typing"><span></span><span></span><span></span> jordan is typing…</div>
               </div>
-              <div class="s-card">
-                <div class="s-label">#general · Gym chat</div>
-                <div class="ex-name">Leg day crew at 6? 🦵</div>
-                <div class="ex-meta">3 replies · 2 friends checked in</div>
-                <div class="setl"><span>@maya</span><b>I'm in 🙋‍♀️</b></div>
-                <div class="setl"><span>@jordan</span><b>Count me in</b></div>
-                <div class="setl"><span>@sam</span><b>Here now 🟢</b></div>
-              </div>
-              <div class="pr"><div style="font-size:20px">🏆</div><div><div class="t">NEW PR · SHARED WITH YOUR CREW</div><div class="v">Bench Press · 185 lbs × 5</div></div></div>
+              <div class="chat-input"><span>Message #general</span><b>➤</b></div>
             </div>
           </div>
         </div>
@@ -292,14 +290,19 @@
             </div>
           </div>
 
-          <div class="phone" role="img" aria-label="Lift'd clip showing a beginner chest press with an on-screen coaching cue and level filters">
+          <div class="phone" role="img" aria-label="Lift'd learning clip: a woman jumping rope with an on-screen coaching cue, beginner and cardio filters">
             <div class="screen clip-screen" aria-hidden="true">
-              <div class="chips"><span class="chip on">Beginner</span><span class="chip">Chest</span><span class="chip">Machine</span></div>
+              <div class="chips"><span class="chip on">Beginner</span><span class="chip">Cardio</span><span class="chip">No equipment</span></div>
               <div class="clip-mock">
-                <div class="clip-figure">🏋️</div>
-                <div class="clip-cue-mock"><b>CUE 2/4</b> Press out, then control the way back</div>
-                <div class="clip-cap"><div class="clip-who"><span class="learn-badge">FORM TIPS</span> Lift'd Learn</div><div class="clip-title">Chest press machine: your first press</div></div>
+                <img class="clip-img" src="/learn-clip.jpg" alt="" width="540" height="960" loading="lazy" />
+                <span class="clip-mute">🔇</span>
                 <div class="clip-rail"><span>♡</span><span>💬</span><span>🔖</span></div>
+                <div class="clip-cap">
+                  <div class="clip-cue-mock"><b>CUE 1/4</b> Stay on the balls of your feet</div>
+                  <div class="clip-who"><span class="learn-badge">FORM TIPS</span> Lift'd Learn</div>
+                  <div class="clip-title">Jump rope: small, quick bounces</div>
+                  <div class="clip-credit">Video: Mixkit</div>
+                </div>
               </div>
             </div>
           </div>

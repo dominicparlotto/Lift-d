@@ -30,7 +30,7 @@ A mobile-style fitness app (React + Vite) with four tabs: Nutrition, Feed (socia
 ## Structure
 - `index.html` — public homepage: static HTML/CSS (no React) so search engines can read it; holds the SEO meta tags + structured data. Links into the app via `app/#signup` / `app/#signin`.
 - `app/index.html` — the React app entry (marked `noindex`). Vite builds both pages (`build.rollupOptions.input` in `vite.config.js`); `base: "./"` keeps asset paths relative, so the build works at the domain root or any sub-path.
-- `public/` — favicon, apple-touch-icon, link-preview image (`og-image.jpg`), `sitemap.xml`. Absolute URLs in `index.html` + `sitemap.xml` point at `https://joinliftd.com/` (custom domain on GitHub Pages; also referenced in `robots.txt` and baked into `og-image.jpg`).
+- `public/` — favicon, apple-touch-icon, link-preview image (`og-image.jpg`), `sitemap.xml`, and `learn-clip.jpg` (a still from the in-app Mixkit jump-rope clip, used in the homepage's "New to the gym?" phone mockup; the hero phone is an illustrative gym-chat mockup with a fictional gym). Absolute URLs in `index.html` + `sitemap.xml` point at `https://joinliftd.com/` (custom domain on GitHub Pages; also referenced in `robots.txt` and baked into `og-image.jpg`).
 - `src/App.jsx` — root component: Supabase session, loads the user's data, defines `actions`, renders the active tab + bottom nav
 - `src/components/` — one file per screen/section:
   - `AuthScreen.jsx` — Supabase sign-in/sign-up/forgot-password screens, `NewPasswordScreen` (reset-link landing), `useUsernameStatus` hook
