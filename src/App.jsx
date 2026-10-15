@@ -116,12 +116,23 @@ export default function App(){
       return ok;
     },
     // Follow + save flip instantly in the UI, then roll back if the server rejects it.
+    // Follow / unfollow / cancel a request. Private accounts get a request ("requested") until they approve it.
     toggleFollow:async id=>{
-      const on=user.following.includes(id);
-      const flip=()=>patch(u=>({following:u.following.includes(id)?u.following.filter(f=>f!==id):[...u.following,id]}));
-      flip();
-      if(!await attempt(()=>on?api.unfollow(user.id,id):api.follow(id)))flip();
+      const was=user.following.includes(id)?"following":user.requested.includes(id)?"requested":null;
+      const set=state=>patch(u=>({following:state==="following"?[...u.following.filter(f=>f!==id),id]:u.following.filter(f=>f!==id),requested:state==="requested"?[...u.requested.filter(f=>f!==id),id]:u.requested.filter(f=>f!==id)}));
+      if(was){set(null);if(!await attempt(()=>api.unfollow(user.id,id)))set(was);return;}
+      set("following");
+      try{const status=await api.follow(id);set(status==="pending"?"requested":"following");}
+      catch(e){console.error(e);set(null);flash("Couldn't follow — try again.");}
     },
+    // Private account: only approved followers see your posts.
+    setPrivate:on=>attempt(async()=>{
+      const profile=await api.updateProfileRow(user.id,{is_private:on});
+      patch(()=>profile);
+      flash(on?"Your account is private — only approved followers can see your posts.":"Your account is public.");
+    },"Couldn't change your privacy setting — try again."),
+    approveFollower:followerId=>attempt(async()=>{await api.approveFollower(user.id,followerId);patch(u=>({followersCount:u.followersCount+1}));},"Couldn't approve — try again."),
+    declineFollower:followerId=>attempt(()=>api.removeFollower(user.id,followerId),"Couldn't decline — try again."),
     toggleSaveClip:async id=>{
       const on=user.savedClips.includes(id);
       const flip=()=>patch(u=>({savedClips:u.savedClips.includes(id)?u.savedClips.filter(c=>c!==id):[...u.savedClips,id]}));
@@ -158,9 +169,8 @@ export default function App(){
     report:r=>attempt(()=>api.reportContent(r),"Couldn't send your report — try again."),
     // Blocking also unfollows them and removes their posts from view (the database hides them from then on).
     block:userId=>attempt(async()=>{
-      await api.blockUser(userId);
-      if(user.following.includes(userId))await api.unfollow(user.id,userId);
-      patch(u=>({following:u.following.filter(f=>f!==userId)}));
+      await api.blockUser(userId); // the database also removes follows and friend links both ways
+      patch(u=>({following:u.following.filter(f=>f!==userId),requested:u.requested.filter(f=>f!==userId)}));
       setPosts(ps=>ps.filter(p=>p.author.id!==userId));
       flash("Blocked. You won't see each other's posts or messages.");
     },"Couldn't block — try again."),
@@ -191,7 +201,7 @@ export default function App(){
       <div className="glow-top"/><div className="glow-bottom"/>
       <div className="content">
         {tab==="nutrition"&&<NutritionTab user={user} actions={actions} onOpenProfile={()=>setTab("profile")}/>}
-        {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions}/>}
+        {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions} onGoToProfile={()=>setTab("profile")}/>}
         {tab==="community"&&<CommunityTab user={user} actions={actions} joinCode={joinCode} onJoinHandled={clearJoinCode}/>}
         {tab==="workout"&&<WorkoutTab user={user} actions={actions}/>}
         {tab==="profile"&&<ProfileTab user={user} actions={actions}/>}

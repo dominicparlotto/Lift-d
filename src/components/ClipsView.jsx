@@ -11,7 +11,7 @@ const ALL_EXERCISES=[...new Set(Object.values(WORKOUTS).flat())].sort();
 const fieldLabel={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted)",marginBottom:6};
 
 // Short-form feed: curated learning clips (with on-screen coaching cues) + members' video posts.
-export default function ClipsView({user,actions,clips,onChanged,filterMuscle,filterSkill,startKey,onStartHandled,onOpenComments,commentCountFor}){
+export default function ClipsView({user,actions,clips,onChanged,filterMuscle,filterSkill,startKey,onStartHandled,onOpenComments,commentCountFor,onOpenProfile}){
   const [idx,setIdx]=useState(0);
   const [liked,setLiked]=useState({});
   const [muted,setMuted]=useState(true);
@@ -143,7 +143,7 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
               {c.kind==="curated"
                 ?<><img src="../favicon.svg" alt="" width="30" height="30" style={{borderRadius:8}}/><div style={{fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:6}}>Lift'd Learn<span className="learn-badge">FORM TIPS</span></div></>
-                :<><Avatar profile={c.author} size={30}/><div style={{fontWeight:700,fontSize:13}}>@{c.author.username}</div></>}
+                :<button className="profile-link" style={{display:"flex",alignItems:"center",gap:8,color:"#fff"}} onClick={e=>{e.stopPropagation();onOpenProfile?.(c.author.id);}}><Avatar profile={c.author} size={30}/><span style={{fontWeight:700,fontSize:13}}>@{c.author.username}</span></button>}
             </div>
             <div className={open?"":"clamp-2"} style={{fontSize:13,lineHeight:1.45}}>
               <span style={{fontWeight:c.kind==="curated"?700:400}}>{c.title}</span>

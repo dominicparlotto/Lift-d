@@ -8,7 +8,10 @@ import PasswordInput from "./PasswordInput";
 import { FeedbackSheet, FeedbackInbox } from "./Feedback";
 import PRShareSheet from "./PRShare";
 import { getTheme, setTheme } from "../utils/theme";
-import { BlockedAccountsSheet, DeleteAccountSheet } from "./Moderation";
+import { BlockedAccountsSheet, DeleteAccountSheet, Sheet, Avatar } from "./Moderation";
+import NewPostSheet from "./NewPostSheet";
+import { PostGrid, PostViewer } from "./Profiles";
+import { ClipPlayer } from "./Reel";
 import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
 
 const avatarImg={width:"100%",height:"100%",borderRadius:"50%",objectFit:"cover",display:"block"};
@@ -18,7 +21,10 @@ const chevron=<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke
 export default function ProfileTab({user,actions}){
   const [tab,setTab]=useState("posts");
   const [notifs,setNotifs]=useState(true);
-  const [priv,setPriv]=useState(false);
+  const [showNewPost,setShowNewPost]=useState(false);
+  const [openPost,setOpenPost]=useState(null); // own post opened from the grid
+  const [playing,setPlaying]=useState(null); // saved clip being watched
+  const [requests,setRequests]=useState([]); const [showRequests,setShowRequests]=useState(false);
   const [dark,setDark]=useState(()=>getTheme()==="dark");
   const [cardPR,setCardPR]=useState(null); // PR being turned into a shareable image
   const [showFeedback,setShowFeedback]=useState(false); const [showInbox,setShowInbox]=useState(false);
@@ -36,6 +42,12 @@ export default function ProfileTab({user,actions}){
     api.loadClips().then(all=>setSavedItems(all.filter(c=>user.savedClips.includes(c.key)))).catch(()=>setSavedItems([]));
   },[tab,user.savedClips.length]);
 
+  // Follow requests (people waiting to follow a private account).
+  useEffect(()=>{api.loadFollowRequests(user.id).then(setRequests).catch(()=>{});},[user.id,user.isPrivate]);
+  async function answer(p,approve){
+    if(await (approve?actions.approveFollower(p.id):actions.declineFollower(p.id)))setRequests(r=>r.filter(x=>x.id!==p.id));
+  }
+
   // Everything below is derived from what the user has actually logged — a new account shows zeros.
   const stats=trainingStats(user.workouts);
   const weekDays=currentWeek().filter(d=>(user.workouts[d.key]||[]).length>0).length;
@@ -51,20 +63,21 @@ export default function ProfileTab({user,actions}){
 
   return(
     <div>
-      <div className="profile-banner"><div className="profile-avatar-wrap"><div className="profile-avatar-ring"><div className="profile-avatar-inner">{user.avatar?<img src={user.avatar} alt="" style={avatarImg}/>:initials(user.name)}</div></div></div><div className="profile-actions-top"><button className="btn-outline btn-sm" onClick={()=>setShowEdit(true)}>Edit Profile</button></div></div>
+      <div className="profile-banner"><div className="profile-avatar-wrap"><div className="profile-avatar-ring"><div className="profile-avatar-inner">{user.avatar?<img src={user.avatar} alt="" style={avatarImg}/>:initials(user.name)}</div></div></div><div className="profile-actions-top"><button className="btn-outline btn-sm" onClick={()=>setShowEdit(true)}>Edit Profile</button><button className="new-post-btn" onClick={()=>setShowNewPost(true)} aria-label="New post">＋</button></div></div>
       <div className="profile-info">
-        <div className="profile-name">{user.name}</div>
+        <div className="profile-name" style={{display:"flex",alignItems:"center",gap:6}}>{user.name}{user.isPrivate&&<span title="Private account" style={{fontSize:14}}>🔒</span>}</div>
         <div className="profile-handle">@{user.username}</div>
         {user.bio?<div className="profile-bio">{user.bio}</div>:<button onClick={()=>setShowEdit(true)} style={{background:"none",border:"none",padding:0,marginTop:8,color:"var(--accent)",font:"600 13px var(--font)",cursor:"pointer"}}>+ Add a bio</button>}
         {user.skill&&<div className="skill-tags"><span className="skill-tag">{user.skill}</span></div>}
         {(user.location||weekDays>0)&&<div className="profile-meta">{user.location&&<div className="profile-meta-item">📍 <span>{user.location}</span></div>}{weekDays>0&&<div className="profile-meta-item">🔥 <span>{weekDays}-Day Streak</span></div>}</div>}
       </div>
       <div className="profile-stats"><div className="profile-stat"><div className="profile-stat-val">{stats.daysTrained}</div><div className="profile-stat-lbl">Workouts</div></div><div className="profile-stat"><div className="profile-stat-val">{user.followersCount}</div><div className="profile-stat-lbl">Followers</div></div><div className="profile-stat"><div className="profile-stat-val">{user.following.length}</div><div className="profile-stat-lbl">Following</div></div><div className="profile-stat"><div className="profile-stat-val">{stats.prCount}</div><div className="profile-stat-lbl">PRs</div></div></div>
+      {requests.length>0&&<button className="requests-card" onClick={()=>setShowRequests(true)}><Avatar profile={requests[0]} size={30}/><div style={{flex:1,textAlign:"left"}}><div style={{fontWeight:700,fontSize:14}}>Follow requests</div><div style={{fontSize:12,color:"var(--muted)"}}>@{requests[0].username}{requests.length>1?` + ${requests.length-1} more`:""}</div></div><span className="requests-count">{requests.length}</span></button>}
       <div className="profile-tabs">{[["posts","Posts"],["prs","PRs"],["badges","Badges"],["saved","Saved"],["settings","Settings"]].map(([id,lbl])=><button key={id} className={`profile-tab ${tab===id?"active":""}`} onClick={()=>setTab(id)}>{lbl}</button>)}</div>
 
       {tab==="posts"&&(<div>
-        {user.posts.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>📝</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12}}>Share a workout from the Feed tab and it'll show up here.</div></div>}
-        {user.posts.map(post=><div key={post.id} style={{padding:"12px 16px",borderBottom:"1px solid var(--line)"}}><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:12,background:"var(--glass)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{post.mediaType==="image"&&post.mediaUrl?<img src={post.mediaUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:12}}/>:post.mediaType==="video"?"🎥":"📝"}</div><div style={{flex:1}}><div style={{fontSize:13,lineHeight:1.5,marginBottom:6}}>{post.content}</div><span style={{fontSize:11,color:"var(--muted)"}}>{timeAgo(post.createdAt)}</span></div></div></div>)}
+        {user.posts.length===0?<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>📸</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No posts yet</div><div style={{fontSize:12,marginBottom:14}}>Share a lift video, a photo, or a PR.</div><button className="btn btn-sm" onClick={()=>setShowNewPost(true)}>＋ Create a post</button></div>
+          :<PostGrid posts={user.posts} onOpen={setOpenPost}/>}
         <div style={{height:24}}/>
       </div>)}
 
@@ -95,7 +108,7 @@ export default function ProfileTab({user,actions}){
         {user.savedClips.length===0&&<div className="saved-empty"><div style={{fontSize:40,marginBottom:12}}>🔖</div><div style={{fontSize:14,fontWeight:600,marginBottom:6}}>No saved content yet</div><div style={{fontSize:12}}>Tap the bookmark icon on any clip to save it here.</div></div>}
         {user.savedClips.length>0&&savedItems===null&&<div style={{padding:"8px 16px",color:"var(--muted)",fontSize:13}}>Loading…</div>}
         {savedItems?.map(c=>(
-          <div key={c.key} className="saved-item"><div className="saved-thumb" style={{background:"linear-gradient(135deg,rgba(36,129,215,0.35),rgba(13,27,42,0.6))"}}>{c.kind==="curated"?"🎓":"🎬"}</div><div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{c.title}</div><div style={{fontSize:12,color:"var(--muted)"}}>{c.kind==="curated"?"Lift'd Learn":`@${c.author.username}`}{c.muscle&&c.muscle!=="All"?` · ${c.muscle}`:""}</div></div>{chevron}</div>
+          <div key={c.key} className="saved-item" role="button" tabIndex={0} style={{cursor:"pointer"}} onClick={()=>setPlaying(c)} onKeyDown={e=>{if(e.key==="Enter")setPlaying(c);}}><div className="saved-thumb" style={{background:"linear-gradient(135deg,rgba(36,129,215,0.35),rgba(13,27,42,0.6))"}}><video src={c.videoUrl+"#t=0.5"} muted playsInline preload="metadata" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:`${c.focusX??50}% 50%`,borderRadius:"inherit"}}/><span className="saved-play">▶</span></div><div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{c.title}</div><div style={{fontSize:12,color:"var(--muted)"}}>{c.kind==="curated"?"Lift'd Learn":`@${c.author.username}`}{c.muscle&&c.muscle!=="All"?` · ${c.muscle}`:""}</div></div>{chevron}</div>
         ))}
       </div>)}
 
@@ -103,9 +116,8 @@ export default function ProfileTab({user,actions}){
         <div className="settings-section"><div className="settings-section-label">Account</div><div className="settings-list">
           <div className="settings-row" onClick={()=>setShowEdit(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>👤</div><div><div className="settings-label">Edit Profile</div><div className="settings-sub">Photo, name, username, bio</div></div></div><div className="settings-right">{chevron}</div></div>
           <div className="settings-row" onClick={()=>setShowPassword(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔒</div><div><div className="settings-label">Change Password</div></div></div><div className="settings-right">{chevron}</div></div>
-          <div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🔗</div><div><div className="settings-label">Connected Apps</div><div className="settings-sub">Apple Health, Strava</div></div></div><div className="settings-right">{chevron}</div></div>
         </div></div>
-        <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div></div></div><label className="toggle"><input type="checkbox" checked={priv} onChange={e=>setPriv(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setShowBlocked(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div><div className="settings-sub">{user.isPrivate?"Only approved followers see your posts":"Anyone can see your posts"}</div></div></div><label className="toggle"><input type="checkbox" checked={!!user.isPrivate} onChange={e=>actions.setPrivate(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setShowBlocked(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Notifications</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔔</div><div><div className="settings-label">Push Notifications</div></div></div><label className="toggle"><input type="checkbox" checked={notifs} onChange={e=>setNotifs(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div><div className="settings-sub">{dark?"On":"Off — light mode"}</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>{setDark(e.target.checked);setTheme(e.target.checked?"dark":"light");}}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span>{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Support</div><div className="settings-list">
@@ -116,6 +128,21 @@ export default function ProfileTab({user,actions}){
         <div style={{padding:"0 16px 32px"}}><button className="btn-danger" onClick={()=>setShowDelete(true)}>Delete Account</button></div>
       </div>)}
 
+      {showNewPost&&<NewPostSheet user={user} actions={actions} onClose={()=>setShowNewPost(false)} onPosted={()=>setTab("posts")}/>}
+      {openPost&&<PostViewer post={openPost} user={user} actions={actions} onClose={()=>setOpenPost(null)}/>}
+      {playing&&<ClipPlayer clip={playing} user={user} actions={actions} onClose={()=>setPlaying(null)}/>}
+      {showRequests&&<Sheet onClose={()=>setShowRequests(false)}>
+        <div className="modal-title">Follow requests</div>
+        <div className="modal-sub">Approve people to let them see your posts.</div>
+        {requests.length===0&&<div className="comment-empty">No pending requests.</div>}
+        {requests.map(p=>(
+          <div key={p.id} className="food-item">
+            <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><Avatar profile={p} size={34}/><div style={{minWidth:0}}><div className="food-name">{p.name}</div><div className="food-amount">@{p.username}</div></div></div>
+            <div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={()=>answer(p,true)}>Approve</button><button className="btn btn-sm btn-ghost" onClick={()=>answer(p,false)}>Decline</button></div>
+          </div>
+        ))}
+        <button className="btn btn-ghost" style={{width:"100%",marginTop:14}} onClick={()=>setShowRequests(false)}>Done</button>
+      </Sheet>}
       {cardPR&&<PRShareSheet pr={cardPR} user={user} actions={actions} onClose={()=>setCardPR(null)}/>}
       {showFeedback&&<FeedbackSheet actions={actions} onClose={()=>setShowFeedback(false)}/>}
       {showInbox&&<FeedbackInbox actions={actions} onClose={()=>setShowInbox(false)}/>}

@@ -140,7 +140,9 @@ export function ClipPlayer({clip,user,actions,onClose}){
           <button className="reel-mute" onClick={()=>setMuted(m=>!m)} aria-label={muted?"Turn sound on":"Turn sound off"}>{muted?"🔇":"🔊"}</button>
         </div>
         <div className="player-info">
-          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}}><span className="learn-badge">FORM TIPS</span>Lift'd Learn</div>
+          {clip.kind==="curated"
+            ?<div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}}><span className="learn-badge">FORM TIPS</span>Lift'd Learn</div>
+            :<div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}}><Avatar profile={clip.author} size={20}/>@{clip.author?.username}</div>}
           <div style={{fontSize:15,fontWeight:700,lineHeight:1.35}}>{clip.title}</div>
           {clip.description&&<div style={{fontSize:13,color:"var(--muted)",marginTop:3,lineHeight:1.45}}>{clip.description}</div>}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:10}}>

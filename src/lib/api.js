@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 
 function check({ data, error }) { if (error) throw error; return data; }
 
-export const toProfile = p => ({ id: p.id, name: p.name, username: p.username, bio: p.bio, location: p.location, skill: p.skill, avatar: p.avatar_url, createdAt: Date.parse(p.created_at) });
+export const toProfile = p => ({ id: p.id, name: p.name, username: p.username, bio: p.bio, location: p.location, skill: p.skill, avatar: p.avatar_url, isPrivate: !!p.is_private, createdAt: Date.parse(p.created_at) });
 const toWorkout = r => ({ id: r.id, exercise: r.exercise, group: r.muscle_group, sets: r.sets, loggedAt: Date.parse(r.logged_at) });
 const toFood = r => ({ id: r.id, name: r.name, grams: +r.grams, calories: +r.calories, protein: +r.protein, carbs: +r.carbs, fat: +r.fat });
 const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, mediaType: r.media_type || null, mediaUrl: r.media_url || null, mediaPath: r.media_path || null, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id, commentCount: commentCount(r) });
@@ -21,8 +21,8 @@ export async function loadUserData(authUser) {
     supabase.from("workout_entries").select("*").eq("user_id", uid).order("logged_at").then(check),
     supabase.from("food_entries").select("*").eq("user_id", uid).order("created_at").then(check),
     supabase.from("posts").select("*").eq("user_id", uid).order("created_at", { ascending: false }).then(check),
-    supabase.from("follows").select("following_id").eq("follower_id", uid).then(check),
-    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", uid).then(r => { if (r.error) throw r.error; return r.count || 0; }),
+    supabase.from("follows").select("following_id, status").eq("follower_id", uid).then(check),
+    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", uid).eq("status", "accepted").then(r => { if (r.error) throw r.error; return r.count || 0; }),
     supabase.from("saved_clips").select("clip_id").eq("user_id", uid).then(check),
     supabase.from("admins").select("user_id").eq("user_id", uid).maybeSingle().then(check),
     supabase.from("nutrition_settings").select("*").eq("user_id", uid).maybeSingle().then(check),
@@ -34,7 +34,8 @@ export async function loadUserData(authUser) {
     workouts: byDay(workouts, toWorkout),
     food: byDay(food, toFood),
     posts: posts.map(toPost),
-    following: following.map(f => f.following_id),
+    following: following.filter(f => f.status === "accepted").map(f => f.following_id),
+    requested: following.filter(f => f.status === "pending").map(f => f.following_id), // follow requests waiting on a private account
     followersCount,
     savedClips: saved.map(s => s.clip_id),
     isAdmin: !!admin,
@@ -104,7 +105,8 @@ export async function uploadPostMedia(uid, file) {
 }
 export const removePostMedia = path => supabase.storage.from("post-media").remove([path]).then(check);
 
-export const follow = id => supabase.from("follows").insert({ following_id: id }).then(check);
+// Following a private account creates a request — returns "accepted" or "pending".
+export const follow = id => supabase.from("follows").insert({ following_id: id }).select("status").single().then(check).then(r => r.status);
 export const unfollow = (uid, id) => supabase.from("follows").delete().eq("follower_id", uid).eq("following_id", id).then(check);
 
 export const saveClip = id => supabase.from("saved_clips").insert({ clip_id: id }).then(check);
@@ -173,6 +175,28 @@ export const sendMessage = (channelId, content) => supabase.from("messages").ins
 export const deleteMessage = id => supabase.from("messages").delete().eq("id", id).then(check);
 export const fetchProfile = id => supabase.from("profiles").select("*").eq("id", id).single().then(check).then(toProfile);
 
+// ---------- Profiles, search, private accounts ----------
+// Post/follower/following counts (shown even for private accounts; null if they've blocked you).
+export const loadProfileStats = id => supabase.rpc("profile_stats", { p_user: id }).then(check).then(rows => rows?.[0] || null);
+// A person's posts — the database returns nothing if their account is private and you don't follow them.
+export async function loadUserPosts(id) {
+  const rows = check(await supabase.from("posts").select("*, author:profiles(*), comments(count)").eq("user_id", id).order("created_at", { ascending: false }).limit(60));
+  return rows.filter(r => r.author).map(r => ({ ...toPost(r), author: toProfile(r.author) }));
+}
+// People search by username or name (anyone who blocked you is left out by the database).
+export async function searchProfiles(q) {
+  const term = q.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_. ]/g, "").slice(0, 40);
+  if (term.length < 1) return [];
+  const rows = check(await supabase.from("profiles").select("*").or(`username.ilike.%${term}%,name.ilike.%${term}%`).limit(25));
+  return rows.map(toProfile);
+}
+export async function loadFollowRequests(uid) {
+  const rows = check(await supabase.from("follows").select("created_at, follower:profiles!follows_follower_id_fkey(*)").eq("following_id", uid).eq("status", "pending").order("created_at", { ascending: false }));
+  return rows.filter(r => r.follower).map(r => toProfile(r.follower));
+}
+export const approveFollower = (uid, followerId) => supabase.from("follows").update({ status: "accepted" }).eq("following_id", uid).eq("follower_id", followerId).then(check);
+export const removeFollower = (uid, followerId) => supabase.from("follows").delete().eq("following_id", uid).eq("follower_id", followerId).then(check);
+
 // Live: calls onNew for every new message in this channel. Returns an unsubscribe function.
 export function subscribeToMessages(channelId, onNew) {
   const ch = supabase.channel(`messages:${channelId}:${Math.random().toString(36).slice(2)}`)
@@ -213,6 +237,7 @@ export const loadLeaderboard = gymId => supabase.rpc("gym_leaderboard", { p_gym:
 
 // ---------- Safety: block, report, delete ----------
 export const blockUser = id => supabase.from("blocks").insert({ blocked_id: id }).then(r => { if (r.error && r.error.code !== "23505") throw r.error; });
+export const loadBlockedIds = () => supabase.from("blocks").select("blocked_id").then(check).then(rows => rows.map(r => r.blocked_id));
 export const unblockUser = (uid, id) => supabase.from("blocks").delete().eq("blocker_id", uid).eq("blocked_id", id).then(check);
 export async function loadBlocked() {
   const rows = check(await supabase.from("blocks").select("created_at, profile:profiles!blocks_blocked_id_fkey(*)").order("created_at", { ascending: false }));
