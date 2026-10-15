@@ -3,6 +3,7 @@ import ClipsView from "./ClipsView";
 import { ActionSheet, ReportSheet, BlockSheet, Avatar } from "./Moderation";
 import { ReelVideo, useCue, CueBadge, CommentsSheet, CommentIcon } from "./Reel";
 import NewPostSheet from "./NewPostSheet";
+import NotificationsSheet from "./Notifications";
 import { UserProfile, PostViewer } from "./Profiles";
 import * as api from "../lib/api";
 import { timeAgo } from "../utils/helpers";
@@ -11,7 +12,6 @@ import { timeAgo } from "../utils/helpers";
 const clipKey=item=>item.kind==="curated"?item.key:`post:${item.id}`;
 
 export default function SocialTab({user,posts,actions,onGoToProfile}){
-  const [liked,setLiked]=useState({});
   const [saved,setSaved]=useState({});
   const [view,setView]=useState("feed");
   const [searchQ,setSearchQ]=useState("");
@@ -33,6 +33,16 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
   useEffect(()=>{loadClips();},[view]);
   const [clipStart,setClipStart]=useState(null); // clip key to open when jumping from the Feed into Clips
   const watchInClips=key=>{setClipStart(key);setView("clips");};
+  const [showInbox,setShowInbox]=useState(false);
+  // Opened from a share link or a notification: show that post, clip or person.
+  useEffect(()=>{
+    const l=actions.deepLink;
+    if(!l)return;
+    actions.clearDeepLink();
+    if(l.type==="post")api.loadPost(l.id).then(p=>p?setOpenPost(p):actions.flash("That post isn't available anymore.")).catch(()=>actions.flash("Couldn't open that post."));
+    else if(l.type==="clip"){setFilterMuscle("All");setFilterSkill("All");watchInClips(`clip:${l.id}`);}
+    else if(l.type==="user")openProfile(l.id);
+  },[actions.deepLink]);
   const [feedMuted,setFeedMuted]=useState(true);
   // Comments: the open sheet's post/clip, plus counts updated in this session (so Feed and Clips stay in sync).
   const [commentsFor,setCommentsFor]=useState(null);
@@ -62,7 +72,7 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
       <div className="search-wrap">
         <div className="search-container"><svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input className="search-input" placeholder="Search people, exercises, clips…" value={searchQ} onFocus={()=>setSearchFocused(true)} onChange={e=>setSearchQ(e.target.value)}/>{searching&&<button className="search-cancel" onClick={()=>{setSearchQ("");setSearchFocused(false);}}>Cancel</button>}</div>
-        {!searching&&<div className="chip-row">{[["feed","🎬 Feed"],["clips","▶ Clips"]].map(([v,l])=><button key={v} className={`chip ${view===v?"active":""}`} onClick={()=>{setView(v);setSearchQ("");}}>{l}</button>)}{<button className={`chip ${showFilters?"active":""}`} onClick={()=>setShowFilters(p=>!p)}>⚙ Filter</button>}</div>}
+        {!searching&&<div className="chip-row"><button className="bell-btn" onClick={()=>setShowInbox(true)} aria-label={actions.unread?`Notifications, ${actions.unread} new`:"Notifications"}>🔔{actions.unread>0&&<span className="bell-badge">{actions.unread>9?"9+":actions.unread}</span>}</button>{[["feed","🎬 Feed"],["clips","▶ Clips"]].map(([v,l])=><button key={v} className={`chip ${view===v?"active":""}`} onClick={()=>{setView(v);setSearchQ("");}}>{l}</button>)}{<button className={`chip ${showFilters?"active":""}`} onClick={()=>setShowFilters(p=>!p)}>⚙ Filter</button>}</div>}
         {showFilters&&!searching&&<div style={{paddingTop:8}}>
           <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted2)",marginBottom:6}}>Muscle Group</div>
           <div className="filter-row">{["All","Chest","Back","Legs","Shoulders","Arms","Core","Cardio"].map(m=><button key={m} className={`filter-pill ${filterMuscle===m?"active":""}`} onClick={()=>setFilterMuscle(m)}>{m}</button>)}</div>
@@ -84,7 +94,7 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
           {filteredPosts.map(post=>{
             const key=clipKey(post), clipLike=post.kind==="curated"||post.mediaType==="video";
             return <FeedCard key={post.feedKey} item={post} user={user} actions={actions} muted={feedMuted} onToggleMute={()=>setFeedMuted(m=>!m)}
-              liked={!!liked[key]} onLike={()=>setLiked(p=>({...p,[key]:!p[key]}))}
+              liked={actions.liked(post)} likes={actions.likeCount(post)} onLike={()=>actions.toggleLike(post)}
               saved={clipLike?user.savedClips.includes(key):!!saved[key]} onSave={()=>clipLike?actions.toggleSaveClip(key):setSaved(p=>({...p,[key]:!p[key]}))}
               comments={countFor(post)} onComments={()=>setCommentsFor(post)} onMenu={()=>setPostMenu(post)} onWatch={()=>watchInClips(key)} onOpenProfile={openProfile}/>;
           })}
@@ -94,6 +104,7 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
       {postMenu&&(postMenu.kind!=="curated"||user.isAdmin)&&<ActionSheet onClose={()=>setPostMenu(null)} options={postMenuOptions(postMenu)}/>}
       {reportTarget&&<ReportSheet target={reportTarget} onReport={actions.report} onBlock={actions.block} onClose={()=>setReportTarget(null)}/>}
       {blockTarget&&<BlockSheet username={blockTarget.username} onConfirm={()=>actions.block(blockTarget.userId)} onClose={()=>setBlockTarget(null)}/>}
+      {showInbox&&<NotificationsSheet user={user} actions={actions} onClose={()=>setShowInbox(false)} onOpenPost={setOpenPost} onOpenProfile={id=>{setShowInbox(false);openProfile(id);}} onGoToProfile={()=>{setShowInbox(false);onGoToProfile?.();}}/>}
       {showUpload&&<NewPostSheet user={user} actions={actions} onClose={()=>setShowUpload(false)}/>}
       {openPost&&<PostViewer post={openPost} user={user} actions={actions} onClose={()=>setOpenPost(null)}/>}
       {commentsFor&&<CommentsSheet item={commentsFor} user={user} actions={actions} onClose={()=>setCommentsFor(null)} onCount={n=>setCommentCounts(c=>({...c,[clipKey(commentsFor)]:n}))}/>}
@@ -104,7 +115,7 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
 // One post in the Feed, laid out like Instagram: header, media, actions, caption, comments.
 // Videos (members' clips and Lift'd Learn clips) use the same frame, crop and coaching cues as the Clips view,
 // play muted while on screen, and open in Clips when tapped.
-function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSave,comments,onComments,onMenu,onWatch,onOpenProfile}){
+function FeedCard({item,user,actions,muted,onToggleMute,liked,likes,onLike,saved,onSave,comments,onComments,onMenu,onWatch,onOpenProfile}){
   const curated=item.kind==="curated";
   const a=item.author;
   const reel=curated?item:item.mediaType==="video"&&item.mediaUrl?{key:`post:${item.id}`,kind:"community",id:item.id,videoUrl:item.mediaUrl,cues:[],focusX:50,cuePosition:"bottom"}:null;
@@ -151,10 +162,10 @@ function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSav
       <div className="post-actions">
         <button className={`action-btn ${liked?"liked":""}`} onClick={onLike} aria-label="Like">
           <svg width="18" height="18" viewBox="0 0 24 24" fill={liked?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          {liked?1:0}
+          {likes}
         </button>
         <button className="action-btn" onClick={onComments} aria-label="Comments"><CommentIcon size={18}/>{comments}</button>
-        <button className="action-btn" aria-label="Share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
+        <button className="action-btn" aria-label="Share" onClick={()=>actions.share(item)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
         <button className={`action-btn ${saved?"saved":""}`} style={{marginLeft:"auto"}} onClick={onSave} aria-label={saved?"Saved":"Save"}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill={saved?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </button>

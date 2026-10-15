@@ -8,9 +8,15 @@ function check({ data, error }) { if (error) throw error; return data; }
 export const toProfile = p => ({ id: p.id, name: p.name, username: p.username, bio: p.bio, location: p.location, skill: p.skill, avatar: p.avatar_url, isPrivate: !!p.is_private, createdAt: Date.parse(p.created_at) });
 const toWorkout = r => ({ id: r.id, exercise: r.exercise, group: r.muscle_group, sets: r.sets, loggedAt: Date.parse(r.logged_at) });
 const toFood = r => ({ id: r.id, name: r.name, grams: +r.grams, calories: +r.calories, protein: +r.protein, carbs: +r.carbs, fat: +r.fat });
-const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, mediaType: r.media_type || null, mediaUrl: r.media_url || null, mediaPath: r.media_path || null, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id, commentCount: commentCount(r) });
+const toPost = r => ({ id: r.id, content: r.content, hasVideo: r.has_video, mediaType: r.media_type || null, mediaUrl: r.media_url || null, mediaPath: r.media_path || null, createdAt: Date.parse(r.created_at), muscle: r.muscle, skill: r.skill, equipment: r.equipment, authorId: r.user_id, commentCount: commentCount(r), likeCount: likeCount(r), likedByMe: likedByMe(r) });
 // Rows selected with `comments(count)` carry how many comments they have (only ones the viewer can see).
 const commentCount = r => r.comments?.[0]?.count ?? 0;
+// Rows selected with POST_SEL/CLIP_SEL (+ .eq("mine.user_id", me)) carry their like count and whether I liked them.
+const likeCount = r => r.likes?.[0]?.count ?? 0;
+const likedByMe = r => (r.mine?.length ?? 0) > 0;
+const POST_SEL = "*, author:profiles(*), comments(count), likes(count), mine:likes(user_id)";
+const CLIP_SEL = "*, comments(count), likes(count), mine:likes(user_id)";
+const myId = async () => (await supabase.auth.getSession()).data.session?.user?.id ?? "00000000-0000-0000-0000-000000000000";
 const byDay = (rows, convert) => rows.reduce((acc, r) => { (acc[r.day] ||= []).push(convert(r)); return acc; }, {});
 
 // Everything the signed-in user's screens need, shaped like the app's `user` object.
@@ -20,7 +26,7 @@ export async function loadUserData(authUser) {
     supabase.from("profiles").select("*").eq("id", uid).single().then(check),
     supabase.from("workout_entries").select("*").eq("user_id", uid).order("logged_at").then(check),
     supabase.from("food_entries").select("*").eq("user_id", uid).order("created_at").then(check),
-    supabase.from("posts").select("*").eq("user_id", uid).order("created_at", { ascending: false }).then(check),
+    supabase.from("posts").select("*, comments(count), likes(count), mine:likes(user_id)").eq("user_id", uid).eq("mine.user_id", uid).order("created_at", { ascending: false }).then(check),
     supabase.from("follows").select("following_id, status").eq("follower_id", uid).then(check),
     supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", uid).eq("status", "accepted").then(r => { if (r.error) throw r.error; return r.count || 0; }),
     supabase.from("saved_clips").select("clip_id").eq("user_id", uid).then(check),
@@ -77,7 +83,7 @@ export const saveNutrition = (uid, n) =>
 
 // Newest posts from everyone (blocked users are filtered out by the database).
 export async function loadFeed() {
-  const rows = check(await supabase.from("posts").select("*, author:profiles(*), comments(count)").order("created_at", { ascending: false }).limit(100));
+  const rows = check(await supabase.from("posts").select(POST_SEL).eq("mine.user_id", await myId()).order("created_at", { ascending: false }).limit(100));
   return rows.filter(r => r.author).map(r => ({ ...toPost(r), author: toProfile(r.author) }));
 }
 
@@ -180,7 +186,7 @@ export const fetchProfile = id => supabase.from("profiles").select("*").eq("id",
 export const loadProfileStats = id => supabase.rpc("profile_stats", { p_user: id }).then(check).then(rows => rows?.[0] || null);
 // A person's posts — the database returns nothing if their account is private and you don't follow them.
 export async function loadUserPosts(id) {
-  const rows = check(await supabase.from("posts").select("*, author:profiles(*), comments(count)").eq("user_id", id).order("created_at", { ascending: false }).limit(60));
+  const rows = check(await supabase.from("posts").select(POST_SEL).eq("user_id", id).eq("mine.user_id", await myId()).order("created_at", { ascending: false }).limit(60));
   return rows.filter(r => r.author).map(r => ({ ...toPost(r), author: toProfile(r.author) }));
 }
 // People search by username or name (anyone who blocked you is left out by the database).
@@ -268,17 +274,18 @@ const toCuratedClip = c => ({
   key: `clip:${c.id}`, kind: "curated", id: c.id, title: c.title, description: c.description, videoUrl: clipUrl(c.video_path), videoPath: c.video_path,
   cues: c.cues || [], music: c.music_title ? { title: c.music_title, source: c.music_source || "" } : null, credit: c.credit,
   muscle: c.muscle, skill: c.skill, equipment: c.equipment, author: null, createdAt: Date.parse(c.created_at), isPublished: c.is_published,
-  focusX: c.focus_x ?? 50, cuePosition: c.cue_position || "bottom", exercises: c.exercises || [], commentCount: commentCount(c),
+  focusX: c.focus_x ?? 50, cuePosition: c.cue_position || "bottom", exercises: c.exercises || [], commentCount: commentCount(c), likeCount: likeCount(c), likedByMe: likedByMe(c),
 });
 const toPostClip = p => ({
   key: `post:${p.id}`, kind: "community", id: p.id, title: p.content, description: "", videoUrl: p.mediaUrl, videoPath: p.mediaPath,
   cues: [], music: null, credit: "", muscle: p.muscle, skill: p.skill, equipment: p.equipment, author: p.author, createdAt: p.createdAt,
-  focusX: 50, cuePosition: "bottom", exercises: [], commentCount: p.commentCount,
+  focusX: 50, cuePosition: "bottom", exercises: [], commentCount: p.commentCount, likeCount: p.likeCount, likedByMe: p.likedByMe,
 });
 export async function loadClips() {
+  const me = await myId();
   const [curated, posts] = await Promise.all([
-    supabase.from("clips").select("*, comments(count)").order("created_at", { ascending: false }).limit(100).then(check),
-    supabase.from("posts").select("*, author:profiles(*), comments(count)").eq("media_type", "video").order("created_at", { ascending: false }).limit(100).then(check),
+    supabase.from("clips").select(CLIP_SEL).eq("mine.user_id", me).order("created_at", { ascending: false }).limit(100).then(check),
+    supabase.from("posts").select(POST_SEL).eq("media_type", "video").eq("mine.user_id", me).order("created_at", { ascending: false }).limit(100).then(check),
   ]);
   const community = posts.filter(r => r.author && r.media_url).map(r => toPostClip({ ...toPost(r), author: toProfile(r.author) }));
   // Learning clips first, then the newest community videos.
@@ -322,3 +329,53 @@ export async function loadComments(item) {
 export const addComment = (item, content) =>
   supabase.from("comments").insert({ ...commentTarget(item), content }).select("*, author:profiles(*)").single().then(check).then(toComment);
 export const deleteComment = id => supabase.from("comments").delete().eq("id", id).then(check);
+
+// ---------- Likes ----------
+// item is a post or a clip (curated clips are liked by clip id, everything else by post id).
+const likeTarget = item => item.kind === "curated" ? { clip_id: item.id } : { post_id: item.id };
+export async function setLike(item, on) {
+  if (on) {
+    const { error } = await supabase.from("likes").insert(likeTarget(item));
+    if (error && error.code !== "23505") throw error; // already liked
+  } else {
+    const [[col, id]] = Object.entries(likeTarget(item));
+    check(await supabase.from("likes").delete().eq("user_id", await myId()).eq(col, id));
+  }
+}
+
+// One post by id (for share links / notifications). Null if it's gone or you're not allowed to see it.
+export async function loadPost(id) {
+  const r = check(await supabase.from("posts").select(POST_SEL).eq("id", id).eq("mine.user_id", await myId()).maybeSingle());
+  return r && r.author ? { ...toPost(r), author: toProfile(r.author) } : null;
+}
+
+// ---------- Notifications (inbox; also pushed to devices that turned push on) ----------
+const toNotification = n => ({ id: n.id, type: n.type, body: n.body, postId: n.post_id, createdAt: Date.parse(n.created_at), read: !!n.read_at,
+  actor: n.actor ? toProfile(n.actor) : null, post: n.post ? { id: n.post.id, content: n.post.content, mediaType: n.post.media_type, mediaUrl: n.post.media_url } : null });
+export async function loadNotifications() {
+  const rows = check(await supabase.from("notifications").select("*, actor:profiles!notifications_actor_id_fkey(*), post:posts(id, content, media_type, media_url)").order("created_at", { ascending: false }).limit(60));
+  return rows.filter(n => n.actor).map(toNotification);
+}
+export const countUnreadNotifications = () =>
+  supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null).then(r => { if (r.error) throw r.error; return r.count || 0; });
+export const markNotificationsRead = () => supabase.from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null).then(check);
+// Live: calls onNew whenever a notification for this user arrives. Returns an unsubscribe function.
+export function subscribeToNotifications(uid, onNew) {
+  const ch = supabase.channel(`notifications:${uid}:${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` }, () => onNew())
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
+
+// ---------- Push notifications (Web Push) ----------
+export async function getPushPublicKey() {
+  const { data, error } = await supabase.functions.invoke("send-push", { body: { action: "public_key" } });
+  if (error) throw error;
+  return data.publicKey;
+}
+export async function savePushSubscription(sub) {
+  const j = sub.toJSON();
+  check(await supabase.from("push_subscriptions").upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_id: await myId() }, { onConflict: "endpoint" }));
+}
+export const deletePushSubscription = endpoint => supabase.from("push_subscriptions").delete().eq("endpoint", endpoint).then(check);
+export const hasPushSubscription = endpoint => supabase.from("push_subscriptions").select("id").eq("endpoint", endpoint).maybeSingle().then(check).then(r => !!r);

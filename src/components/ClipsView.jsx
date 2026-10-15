@@ -13,7 +13,6 @@ const fieldLabel={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpa
 // Short-form feed: curated learning clips (with on-screen coaching cues) + members' video posts.
 export default function ClipsView({user,actions,clips,onChanged,filterMuscle,filterSkill,startKey,onStartHandled,onOpenComments,commentCountFor,onOpenProfile}){
   const [idx,setIdx]=useState(0);
-  const [liked,setLiked]=useState({});
   const [muted,setMuted]=useState(true);
   const [expanded,setExpanded]=useState(null); // key of the clip whose full caption is showing
   const [menu,setMenu]=useState(null);
@@ -126,8 +125,9 @@ export default function ClipsView({user,actions,clips,onChanged,filterMuscle,fil
           {cue&&c.cuePosition==="top"&&<div className="reel-cue-top" style={{top:62}}>{cue}</div>}
           <div style={{position:"absolute",right:12,bottom:96,display:"flex",flexDirection:"column",gap:16,alignItems:"center",zIndex:10}}>
             {[
-              {label:"Like",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill={liked[c.key]?"#FF7A6E":"none"} stroke={liked[c.key]?"#FF7A6E":"white"} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,count:liked[c.key]?"Liked":"Like",action:()=>setLiked(p=>({...p,[c.key]:!p[c.key]}))},
+              {label:"Like",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill={actions.liked(c)?"#FF7A6E":"none"} stroke={actions.liked(c)?"#FF7A6E":"white"} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,count:actions.likeCount(c)||"Like",action:()=>actions.toggleLike(c)},
               ...(onOpenComments?[{label:"Comments",icon:<CommentIcon color="white"/>,count:comments||"Comment",action:()=>onOpenComments(c)}]:[]),
+              {label:"Share",icon:<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,count:"Share",action:()=>actions.share(c)},
               {label:"Save",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill={saved?"#FFD700":"none"} stroke={saved?"#FFD700":"white"} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>,count:saved?"Saved":"Save",action:()=>actions.toggleSaveClip(c.key)},
               ...(options.length?[{label:"More",icon:<span style={{color:"#fff",fontSize:20,fontWeight:800,lineHeight:1}}>⋯</span>,count:"More",action:()=>setMenu(c)}]:[]),
             ].map(a=>(

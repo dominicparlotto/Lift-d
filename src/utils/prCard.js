@@ -1,4 +1,5 @@
 // Draws a story-sized (1080×1920) PR card image to share on Instagram/TikTok/group chats.
+import { wShow, wLabel } from "./units";
 const W=1080, H=1920;
 
 function wrapLines(ctx,text,maxWidth){
@@ -11,7 +12,7 @@ function loadImage(src){return new Promise(res=>{const img=new Image();img.onloa
 const prettyDate=key=>{const [y,m,d]=key.split("-").map(Number);return new Date(y,m-1,d).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});};
 
 // pr: {exercise, weight, reps, dateKey}; returns a PNG Blob.
-export async function makePRCard(pr,username){
+export async function makePRCard(pr,username,units){
   const font='"DM Sans", system-ui, -apple-system, sans-serif';
   try{await Promise.all([document.fonts.load(`800 100px "DM Sans"`),document.fonts.load(`600 40px "DM Sans"`)]);}catch{/* falls back to system font */}
   const c=document.createElement("canvas"); c.width=W; c.height=H;
@@ -43,8 +44,8 @@ export async function makePRCard(pr,username){
 
   // Weight × reps
   const grad=g.createLinearGradient(W/2-360,0,W/2+360,0); grad.addColorStop(0,"#4F8EF7"); grad.addColorStop(1,"#8B7BFF");
-  g.fillStyle=grad; g.font=`800 230px ${font}`; g.fillText(`${pr.weight}`,W/2,y+290);
-  g.fillStyle="rgba(238,242,255,0.75)"; g.font=`700 76px ${font}`; g.fillText(`lbs × ${pr.reps} ${pr.reps===1?"rep":"reps"}`,W/2,y+400);
+  g.fillStyle=grad; g.font=`800 230px ${font}`; g.fillText(`${wShow(pr.weight,units)}`,W/2,y+290);
+  g.fillStyle="rgba(238,242,255,0.75)"; g.font=`700 76px ${font}`; g.fillText(`${wLabel(units)} × ${pr.reps} ${pr.reps===1?"rep":"reps"}`,W/2,y+400);
   g.fillStyle="rgba(238,242,255,0.5)"; g.font=`600 44px ${font}`; g.fillText(prettyDate(pr.dateKey),W/2,y+480);
 
   // Footer

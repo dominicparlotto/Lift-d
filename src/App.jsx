@@ -10,6 +10,7 @@ import { supabase } from "./lib/supabase";
 import * as api from "./lib/api";
 import { dateKey } from "./utils/helpers";
 import { friendlyAuthError } from "./utils/validation";
+import { disablePush } from "./lib/push";
 
 const shell={maxWidth:430,margin:"0 auto",height:"100vh",overflow:"auto",background:"var(--bg)"};
 
@@ -34,6 +35,27 @@ export default function App(){
     window.addEventListener("hashchange",onHash);
     return ()=>window.removeEventListener("hashchange",onHash);
   },[]);
+  // Share links and push notifications open a specific thing: #post=ID, #clip=ID, #user=ID, #requests.
+  const readLink=()=>{const m=window.location.hash.match(/^#(post|clip|user)=([0-9a-f-]{36})$/i);return m?{type:m[1],id:m[2]}:window.location.hash==="#requests"?{type:"requests"}:null;};
+  const [deepLink,setDeepLink]=useState(()=>{
+    const l=readLink();
+    try{if(l)sessionStorage.setItem("liftd.link",JSON.stringify(l));return l||JSON.parse(sessionStorage.getItem("liftd.link")||"null");}
+    catch{return l;}
+  });
+  useEffect(()=>{
+    const onHash=()=>{const l=readLink();if(l)setDeepLink(l);};
+    window.addEventListener("hashchange",onHash);
+    return ()=>window.removeEventListener("hashchange",onHash);
+  },[]);
+  function clearDeepLink(){
+    setDeepLink(null);
+    try{sessionStorage.removeItem("liftd.link");}catch{/* storage unavailable */}
+    if(/^#(post|clip|user)=|^#requests$/.test(window.location.hash))window.history.replaceState(null,"",window.location.pathname);
+  }
+  // Unread notifications (🔔 badge), kept live.
+  const [unread,setUnread]=useState(0);
+  const refreshUnread=()=>api.countUnreadNotifications().then(setUnread).catch(()=>{});
+
   function clearJoinCode(){
     setJoinCode(null);
     try{sessionStorage.removeItem("liftd.join");}catch{/* storage unavailable */}
@@ -62,6 +84,20 @@ export default function App(){
   useEffect(()=>{
     if(user&&tab==="social")api.loadFeed().then(setPosts).catch(e=>{console.error(e);flash("Couldn't load the feed.");});
   },[tab,user?.id]);
+  useEffect(()=>{
+    if(!user)return;
+    refreshUnread();
+    return api.subscribeToNotifications(user.id,refreshUnread);
+  },[user?.id]);
+  // A share/notification link opens the Feed (posts, clips, people) or your Profile (follow requests).
+  useEffect(()=>{
+    if(!user||!deepLink)return;
+    if(deepLink.type==="requests"){setTab("profile");clearDeepLink();}
+    else setTab("social");
+  },[user?.id,deepLink]);
+  // Likes: shown instantly; overrides[key] is what the user has toggled since the item was loaded.
+  const [likeOverrides,setLikeOverrides]=useState({});
+  const likeKey=item=>item.kind==="curated"?item.key:`post:${item.id}`;
   // An invite link opens the Community tab, where the gym is joined and opened.
   useEffect(()=>{if(user&&joinCode)setTab("community");},[user?.id,joinCode]);
 
@@ -74,6 +110,30 @@ export default function App(){
   const patch=fn=>setUser(u=>u&&{...u,...fn(u)});
 
   const actions={
+    liked:item=>likeOverrides[likeKey(item)]??!!item.likedByMe,
+    likeCount:item=>{const k=likeKey(item),o=likeOverrides[k];return Math.max(0,(item.likeCount||0)+(o===undefined?0:(o?1:0)-(item.likedByMe?1:0)));},
+    toggleLike:async item=>{
+      const k=likeKey(item), next=!(likeOverrides[k]??!!item.likedByMe);
+      setLikeOverrides(o=>({...o,[k]:next}));
+      try{await api.setLike(item,next);}
+      catch(e){console.error(e);setLikeOverrides(o=>({...o,[k]:!next}));flash("Couldn't save your like — try again.");}
+    },
+    // Share a post or clip: the phone's share sheet, or copy the link on a computer.
+    share:async item=>{
+      const url=`${window.location.origin}/app/#${item.kind==="curated"?`clip=${item.id}`:`post=${item.id}`}`;
+      const who=item.kind==="curated"?"Lift'd Learn":`@${item.author?.username}`;
+      const text=item.kind==="curated"?`${item.title} — form tips on Lift'd`:`${who} on Lift'd: ${(item.content||"").slice(0,100)}`;
+      try{
+        if(navigator.share){await navigator.share({title:"Lift'd",text,url});return;}
+        await navigator.clipboard.writeText(url);flash("Link copied — paste it anywhere to share.");
+      }catch(e){
+        if(e?.name==="AbortError")return; // closed the share sheet
+        try{await navigator.clipboard.writeText(url);flash("Link copied — paste it anywhere to share.");}
+        catch{flash(`Share this link: ${url}`);}
+      }
+    },
+    unread,setUnread,refreshUnread,
+    deepLink,clearDeepLink,
     logWorkout:entry=>attempt(async()=>{
       const day=dateKey();const saved=await api.insertWorkout(day,entry);
       patch(u=>({workouts:{...u.workouts,[day]:[...(u.workouts[day]||[]),saved]}}));
@@ -155,6 +215,7 @@ export default function App(){
       return error?friendlyAuthError(error):null;
     },
     signOut:async()=>{
+      await disablePush().catch(()=>{}); // stop this device getting the old account's alerts
       await supabase.auth.signOut();
       setTab("nutrition");setPosts([]);
       window.history.replaceState(null,"",window.location.pathname); // drop #signup/#signin so the start screen shows
@@ -176,6 +237,7 @@ export default function App(){
     },"Couldn't block — try again."),
     unblock:userId=>attempt(()=>api.unblockUser(user.id,userId),"Couldn't unblock — try again."),
     deleteAccount:()=>attempt(async()=>{
+      await disablePush().catch(()=>{});
       await api.deleteMyAccount(user.id);
       await supabase.auth.signOut().catch(()=>{}); // the account is already gone; this just clears the local session
       setTab("nutrition");setPosts([]);setUser(null);
@@ -207,7 +269,7 @@ export default function App(){
         {tab==="profile"&&<ProfileTab user={user} actions={actions}/>}
       </div>
       {toast&&<div className="toast" role="status">{toast}</div>}
-      <nav className="nav">{tabs.map(t=><button key={t.id} className={`nav-btn ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}>{t.icon}{t.label}<div className="nav-bar"/></button>)}</nav>
+      <nav className="nav">{tabs.map(t=><button key={t.id} className={`nav-btn ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}><span className="nav-icon-wrap">{t.icon}{t.id==="social"&&unread>0&&<span className="nav-badge" aria-label={`${unread} new notifications`}>{unread>9?"9+":unread}</span>}</span>{t.label}<div className="nav-bar"/></button>)}</nav>
     </div>
   );
 }

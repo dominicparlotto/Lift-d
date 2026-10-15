@@ -8,6 +8,8 @@ import PasswordInput from "./PasswordInput";
 import { FeedbackSheet, FeedbackInbox } from "./Feedback";
 import PRShareSheet from "./PRShare";
 import { getTheme, setTheme } from "../utils/theme";
+import { pushSupport, isPushOn, enablePush, disablePush } from "../lib/push";
+import { unitsOf, fmtW, wShow, wLabel } from "../utils/units";
 import { BlockedAccountsSheet, DeleteAccountSheet, Sheet, Avatar } from "./Moderation";
 import NewPostSheet from "./NewPostSheet";
 import { PostGrid, PostViewer } from "./Profiles";
@@ -20,7 +22,8 @@ const chevron=<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke
 
 export default function ProfileTab({user,actions}){
   const [tab,setTab]=useState("posts");
-  const [notifs,setNotifs]=useState(true);
+  // Push notifications for this device (real Web Push; see src/lib/push.js).
+  const [push,setPush]=useState({on:false,busy:false,support:pushSupport()});
   const [showNewPost,setShowNewPost]=useState(false);
   const [openPost,setOpenPost]=useState(null); // own post opened from the grid
   const [playing,setPlaying]=useState(null); // saved clip being watched
@@ -28,7 +31,7 @@ export default function ProfileTab({user,actions}){
   const [dark,setDark]=useState(()=>getTheme()==="dark");
   const [cardPR,setCardPR]=useState(null); // PR being turned into a shareable image
   const [showFeedback,setShowFeedback]=useState(false); const [showInbox,setShowInbox]=useState(false);
-  const [units,setUnits]=useState("imperial");
+  const units=unitsOf(user);
   const [sharedPR,setSharedPR]=useState({});
   const [showEdit,setShowEdit]=useState(false);
   const [showPassword,setShowPassword]=useState(false);
@@ -41,6 +44,27 @@ export default function ProfileTab({user,actions}){
     if(tab!=="saved")return;
     api.loadClips().then(all=>setSavedItems(all.filter(c=>user.savedClips.includes(c.key)))).catch(()=>setSavedItems([]));
   },[tab,user.savedClips.length]);
+
+  useEffect(()=>{if(tab==="settings")isPushOn().then(on=>setPush(p=>({...p,on,support:pushSupport()}))).catch(()=>{});},[tab]);
+  async function togglePush(on){
+    setPush(p=>({...p,busy:true}));
+    try{
+      if(on)await enablePush();else await disablePush();
+      setPush({on,busy:false,support:pushSupport()});
+      actions.flash(on?"Push notifications are on for this device.":"Push notifications are off for this device.");
+    }catch(e){
+      setPush({on:false,busy:false,support:pushSupport()});
+      const why=e?.message;
+      actions.flash(why==="denied"?"Notifications are blocked — allow them for Lift'd in your browser or phone settings, then try again."
+        :why==="needs-install"?"On iPhone, add Lift'd to your Home Screen first (Share → Add to Home Screen), open it from there, then turn this on."
+        :why==="unsupported"?"This browser doesn't support push notifications — you'll still see everything in the 🔔 inbox."
+        :why==="dismissed"?"No problem — turn it on whenever you're ready.":"Couldn't turn on notifications — try again.");
+    }
+  }
+  const pushSub=push.support==="needs-install"?"iPhone: add Lift'd to your Home Screen first"
+    :push.support==="denied"?"Blocked in your browser settings"
+    :push.support==="unsupported"?"Not supported in this browser — check the 🔔 inbox"
+    :push.on?"Likes, comments and followers on this device":"Get alerts on this device";
 
   // Follow requests (people waiting to follow a private account).
   useEffect(()=>{api.loadFollowRequests(user.id).then(setRequests).catch(()=>{});},[user.id,user.isPrivate]);
@@ -57,7 +81,7 @@ export default function ProfileTab({user,actions}){
 
   async function sharePR(pr){
     setSharedPR(p=>({...p,[pr.exercise]:"sending"}));
-    const ok=await actions.createPost({content:`🏆 New PR: ${pr.exercise} — ${pr.weight} lbs × ${pr.reps}`});
+    const ok=await actions.createPost({content:`🏆 New PR: ${pr.exercise} — ${fmtW(pr.weight,units)} × ${pr.reps}`});
     setSharedPR(p=>({...p,[pr.exercise]:ok?"done":undefined}));
   }
 
@@ -90,7 +114,7 @@ export default function ProfileTab({user,actions}){
             <div key={pr.exercise} className="pr-card">
               <div className="pr-title">🏆 PERSONAL RECORD</div>
               <div className="pr-exercise">{pr.exercise}</div>
-              <div className="pr-weight">{pr.weight}<span style={{fontSize:20,fontWeight:600}}> lbs</span> <span style={{fontSize:16,fontWeight:600,color:"var(--muted)"}}>× {pr.reps}</span></div>
+              <div className="pr-weight">{wShow(pr.weight,units)}<span style={{fontSize:20,fontWeight:600}}> {wLabel(units)}</span> <span style={{fontSize:16,fontWeight:600,color:"var(--muted)"}}>× {pr.reps}</span></div>
               <div className="pr-delta">{pr.dateKey===todayKey?"Today":shortDate(pr.dateKey)}</div>
               <div className="pr-actions"><button className="pr-share-btn ghost" onClick={()=>setCardPR(pr)}>📸 Story</button><button className="pr-share-btn" disabled={!!sharedPR[pr.exercise]} onClick={()=>sharePR(pr)}>{sharedPR[pr.exercise]==="done"?"✓ Shared!":sharedPR[pr.exercise]==="sending"?"Sharing…":"📤 Share to Feed"}</button></div>
             </div>
@@ -118,8 +142,8 @@ export default function ProfileTab({user,actions}){
           <div className="settings-row" onClick={()=>setShowPassword(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔒</div><div><div className="settings-label">Change Password</div></div></div><div className="settings-right">{chevron}</div></div>
         </div></div>
         <div className="settings-section"><div className="settings-section-label">Privacy</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>🔐</div><div><div className="settings-label">Private Account</div><div className="settings-sub">{user.isPrivate?"Only approved followers see your posts":"Anyone can see your posts"}</div></div></div><label className="toggle"><input type="checkbox" checked={!!user.isPrivate} onChange={e=>actions.setPrivate(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setShowBlocked(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚫</div><div><div className="settings-label">Blocked Accounts</div></div></div><div className="settings-right">{chevron}</div></div></div></div>
-        <div className="settings-section"><div className="settings-section-label">Notifications</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔔</div><div><div className="settings-label">Push Notifications</div></div></div><label className="toggle"><input type="checkbox" checked={notifs} onChange={e=>setNotifs(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div></div></div>
-        <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div><div className="settings-sub">{dark?"On":"Off — light mode"}</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>{setDark(e.target.checked);setTheme(e.target.checked?"dark":"light");}}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>setUnits(u=>u==="imperial"?"metric":"imperial")}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs / ft":"kg / cm"}</span>{chevron}</div></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Notifications</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🔔</div><div><div className="settings-label">Push Notifications</div><div className="settings-sub">{push.busy?"Updating…":pushSub}</div></div></div><label className="toggle"><input type="checkbox" checked={push.on} disabled={push.busy} onChange={e=>togglePush(e.target.checked)}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div></div></div>
+        <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div><div className="settings-sub">{dark?"On":"Off — light mode"}</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>{setDark(e.target.checked);setTheme(e.target.checked?"dark":"light");}}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>actions.saveNutrition({...user.nutrition,units:units==="imperial"?"metric":"imperial"})}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs · mi · ft":"kg · km · cm"}</span>{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Support</div><div className="settings-list">
           <div className="settings-row" onClick={()=>setShowFeedback(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>💬</div><div><div className="settings-label">Send Feedback</div><div className="settings-sub">Report a bug or suggest an idea</div></div></div><div className="settings-right">{chevron}</div></div>
           {user.isAdmin&&<div className="settings-row" onClick={()=>setShowInbox(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📥</div><div><div className="settings-label">Feedback Inbox</div><div className="settings-sub">Admin · read what people sent</div></div></div><div className="settings-right">{chevron}</div></div>}
@@ -143,7 +167,7 @@ export default function ProfileTab({user,actions}){
         ))}
         <button className="btn btn-ghost" style={{width:"100%",marginTop:14}} onClick={()=>setShowRequests(false)}>Done</button>
       </Sheet>}
-      {cardPR&&<PRShareSheet pr={cardPR} user={user} actions={actions} onClose={()=>setCardPR(null)}/>}
+      {cardPR&&<PRShareSheet pr={cardPR} units={units} user={user} actions={actions} onClose={()=>setCardPR(null)}/>}
       {showFeedback&&<FeedbackSheet actions={actions} onClose={()=>setShowFeedback(false)}/>}
       {showInbox&&<FeedbackInbox actions={actions} onClose={()=>setShowInbox(false)}/>}
       {showEdit&&<EditProfileModal user={user} onClose={()=>setShowEdit(false)} onSave={async(fields,avatar)=>{if(await actions.updateProfile(fields,avatar))setShowEdit(false);}}/>}

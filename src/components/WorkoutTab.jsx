@@ -5,6 +5,7 @@ import { ClipPlayer } from "./Reel";
 import PRShareSheet from "./PRShare";
 import * as api from "../lib/api";
 import { dateKey, shortDate, currentWeek, setVolume, bestSets } from "../utils/helpers";
+import { unitsOf, wLabel, dLabel, wShow, dShow, wStore, dStore, fmtW, fmtD } from "../utils/units";
 
 
 export default function WorkoutTab({user,actions}){
@@ -20,6 +21,7 @@ export default function WorkoutTab({user,actions}){
   const [prPage,setPrPage]=useState(0);
   const [saving,setSaving]=useState(false);
   const carouselRef=useRef(null);
+  const units=unitsOf(user); // lbs/mi or kg/km — everything is saved in lbs and miles
   // Learning clips linked to exercises → "▶ Form" buttons in the log.
   const [learnClips,setLearnClips]=useState(null);
   const [playing,setPlaying]=useState(null); // clip open in the pop-up player
@@ -68,11 +70,11 @@ export default function WorkoutTab({user,actions}){
     if(!selectedEx||saving)return;
     let s;
     if(isDistance(selectedEx)){
-      s=getSets(selectedEx).filter(x=>parseFloat(x.miles)>0).map(x=>({miles:Math.round(parseFloat(x.miles)*100)/100,minutes:parseFloat(x.minutes)>0?Math.round(parseFloat(x.minutes)*10)/10:null}));
-      if(s.some(x=>x.miles>100)){actions.flash("That's more than 100 miles — check the distance.");return;}
-      if(!s.length){actions.flash("Enter how many miles you ran.");return;}
+      s=getSets(selectedEx).filter(x=>parseFloat(x.miles)>0).map(x=>({miles:dStore(x.miles,units),minutes:parseFloat(x.minutes)>0?Math.round(parseFloat(x.minutes)*10)/10:null}));
+      if(s.some(x=>x.miles>100)){actions.flash(`That's more than ${fmtD(100,units)} — check the distance.`);return;}
+      if(!s.length){actions.flash(`Enter the distance in ${units==="metric"?"kilometers":"miles"}.`);return;}
     }else{
-      s=getSets(selectedEx).filter(x=>x.weight&&x.reps).map(x=>({weight:parseFloat(x.weight),reps:parseInt(x.reps)}));
+      s=getSets(selectedEx).filter(x=>x.weight&&x.reps).map(x=>({weight:wStore(x.weight,units),reps:parseInt(x.reps)}));
       if(!s.length)return;
     }
     setSaving(true);
@@ -138,7 +140,7 @@ export default function WorkoutTab({user,actions}){
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px 10px"}}>
                 <div>
                   <div style={{fontSize:17,fontWeight:800,letterSpacing:"-0.3px"}}>{focusLabel}'s Workout</div>
-                  <div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>{focusLog.length} exercises · {focusSets} sets · {focusVolume.toLocaleString()} lbs</div>
+                  <div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>{focusLog.length} exercises · {focusSets} sets · {fmtW(focusVolume,units)}</div>
                 </div>
                 <button onClick={()=>setOpenDay(null)} style={{width:32,height:32,borderRadius:"50%",background:"var(--glass)",border:"1px solid var(--border)",color:"var(--text)",fontSize:15,cursor:"pointer",flexShrink:0}}>✕</button>
               </div>
@@ -159,12 +161,12 @@ export default function WorkoutTab({user,actions}){
                               <span className="tag">{w.group}</span>
                             </div>
                             <div style={{fontSize:20,fontWeight:800,letterSpacing:"-0.3px",marginBottom:3}}>{w.exercise}</div>
-                            <div style={{fontSize:12,color:"var(--accent3)",fontWeight:600,marginBottom:16}}>{run?`${Math.round(miles*100)/100} miles${mins?` · ${Math.round(mins)} min`:""}`:`Top set ${top} lbs · ${setVolume(w.sets).toLocaleString()} lbs volume`}</div>
+                            <div style={{fontSize:12,color:"var(--accent3)",fontWeight:600,marginBottom:16}}>{run?`${fmtD(miles,units)}${mins?` · ${Math.round(mins)} min`:""}`:`Top set ${fmtW(top,units)} · ${fmtW(setVolume(w.sets),units)} volume`}</div>
                             {w.sets.map((s,j)=>(
                               <div key={j} className="set-line">
                                 <span className="set-line-num">{run?`${distanceLabel(w.exercise)} ${j+1}`:`Set ${j+1}`}</span>
-                                {run?<span className="set-line-val">{s.miles} mi{s.minutes?<><span style={{color:"var(--muted)"}}> · </span>{s.minutes} min</>:null}</span>
-                                  :<span className="set-line-val">{s.weight} lbs <span style={{color:"var(--muted)"}}>×</span> {s.reps} reps</span>}
+                                {run?<span className="set-line-val">{fmtD(s.miles,units)}{s.minutes?<><span style={{color:"var(--muted)"}}> · </span>{s.minutes} min</>:null}</span>
+                                  :<span className="set-line-val">{fmtW(s.weight,units)} <span style={{color:"var(--muted)"}}>×</span> {s.reps} reps</span>}
                               </div>
                             ))}
                           </div>
@@ -189,7 +191,7 @@ export default function WorkoutTab({user,actions}){
               <div className="stat-grid">
                 <div className="stat-card"><div className="stat-val">{todayLog.length}</div><div className="stat-lbl">Exercises</div><div className="stat-change">Today</div></div>
                 <div className="stat-card"><div className="stat-val">{todaySets}</div><div className="stat-lbl">Total Sets</div><div className="stat-change">Today</div></div>
-                <div className="stat-card"><div className="stat-val">{todayVolume>=1000?(todayVolume/1000).toFixed(1)+"k":todayVolume||0}</div><div className="stat-lbl">Volume (lbs)</div><div className="stat-change">Today</div></div>
+                <div className="stat-card"><div className="stat-val">{(v=>v>=1000?(v/1000).toFixed(1)+"k":v)(wShow(todayVolume,units))}</div><div className="stat-lbl">Volume ({wLabel(units)})</div><div className="stat-change">Today</div></div>
                 <div className="stat-card"><div style={{fontSize:26,WebkitTextFillColor:"initial"}}>🔥</div><div className="stat-lbl">{daysTrained}-Day Streak</div><div className="stat-change">This week</div></div>
               </div>
 
@@ -211,7 +213,7 @@ export default function WorkoutTab({user,actions}){
                     <div><div className="food-name">{r.exercise}</div><div className="food-amount">{r.date}</div></div>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontWeight:800,color:r.isNewPR?"var(--accent3)":"var(--text)"}}>{r.weight}lbs × {r.reps}</div>
+                        <div style={{fontWeight:800,color:r.isNewPR?"var(--accent3)":"var(--text)"}}>{fmtW(r.weight,units)} × {r.reps}</div>
                         {r.isNewPR&&<div style={{fontSize:10,color:"var(--accent3)",fontWeight:700}}>NEW PR 🎉</div>}
                       </div>
                       <button className="pr-row-share" onClick={()=>setSharePR({exercise:r.exercise,weight:r.weight,reps:r.reps,dateKey:r.dateKey})} aria-label={`Share ${r.exercise} PR`}>📤</button>
@@ -248,14 +250,14 @@ export default function WorkoutTab({user,actions}){
                 {mine&&<button className={`custom-ex-remove ${confirmRemove===mine.id?"confirm":""}`} onClick={e=>{e.stopPropagation();removeExercise(mine);}}>{confirmRemove===mine.id?"Remove?":"✕"}</button>}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><polyline points={selectedEx===ex?"18 15 12 9 6 15":"6 9 12 15 18 9"}/></svg>
               </div>
-              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><div style={{display:"flex",gap:6}}>{formClip(ex)&&<button className="add-set-btn" onClick={()=>setPlaying(formClip(ex))}>▶ Form</button>}<button className="add-set-btn" onClick={()=>addSet(ex)}>{isDistance(ex)?`+ ${distanceLabel(ex)}`:"+ Set"}</button></div></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div>{isDistance(ex)?<><input className="set-input" inputMode="decimal" placeholder="miles" value={s.miles} onChange={e=>updateSet(ex,i,"miles",e.target.value.replace(/[^0-9.]/g,""))} aria-label="Miles"/><input className="set-input" inputMode="decimal" placeholder="min" value={s.minutes} onChange={e=>updateSet(ex,i,"minutes",e.target.value.replace(/[^0-9.]/g,""))} aria-label="Minutes"/><div className="set-label">miles · minutes</div></>:<><input className="set-input" inputMode="decimal" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div></>}<button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
+              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><div style={{display:"flex",gap:6}}>{formClip(ex)&&<button className="add-set-btn" onClick={()=>setPlaying(formClip(ex))}>▶ Form</button>}<button className="add-set-btn" onClick={()=>addSet(ex)}>{isDistance(ex)?`+ ${distanceLabel(ex)}`:"+ Set"}</button></div></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div>{isDistance(ex)?<><input className="set-input" inputMode="decimal" placeholder={dLabel(units)} value={s.miles} onChange={e=>updateSet(ex,i,"miles",e.target.value.replace(/[^0-9.]/g,""))} aria-label="Miles"/><input className="set-input" inputMode="decimal" placeholder="min" value={s.minutes} onChange={e=>updateSet(ex,i,"minutes",e.target.value.replace(/[^0-9.]/g,""))} aria-label="Minutes"/><div className="set-label">{units==="metric"?"km":"miles"} · minutes</div></>:<><input className="set-input" inputMode="decimal" placeholder={wLabel(units)} value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div></>}<button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
             </div>
           );})}
           {exercises.length===0&&<div style={{padding:"24px 20px",textAlign:"center",color:"var(--muted)",fontSize:14}}>No exercises found for "{exSearch}" — add it above.</div>}
         </div>
       )}
       {playing&&<ClipPlayer clip={playing} user={user} actions={actions} onClose={()=>setPlaying(null)}/>}
-      {sharePR&&<PRShareSheet pr={sharePR} user={user} actions={actions} onClose={()=>setSharePR(null)}/>}
+      {sharePR&&<PRShareSheet pr={sharePR} units={units} user={user} actions={actions} onClose={()=>setSharePR(null)}/>}
     </div>
   );
 }

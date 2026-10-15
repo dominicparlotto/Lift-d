@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "../lib/api";
 import { timeAgo, currentWeek } from "../utils/helpers";
+import { unitsOf, fmtW, fmtD } from "../utils/units";
 import { Sheet, ActionSheet, ReportSheet, BlockSheet } from "./Moderation";
 
 const backBtn={background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontSize:13,fontWeight:700,marginBottom:4,padding:0};
@@ -238,15 +239,16 @@ export function GymRoom({gymId,user,actions,onBack}){
 
 // Gym competitions, all from what members log in the Workout tab. Weekly boards reset every Monday.
 const BOARDS=[
-  {id:"volume",label:"🏋️ Volume",title:"This week's volume",value:e=>e.volume,show:e=>`${Math.round(e.volume).toLocaleString()} lbs`,
+  {id:"volume",label:"🏋️ Volume",title:"This week's volume",value:e=>e.volume,show:(e,u)=>fmtW(Math.round(e.volume),u),
    note:"Weight × reps from every lift logged this week (Mon–Sun)."},
-  {id:"miles",label:"🏃 Miles",title:"Miles run this week",value:e=>e.miles,show:e=>`${(Math.round(e.miles*10)/10).toLocaleString()} mi`,
+  {id:"miles",label:"🏃 Distance",title:"Distance run this week",value:e=>e.miles,show:(e,u)=>fmtD(e.miles,u),
    note:"Miles from runs logged this week — Running Treadmill, Running Outdoor and Sprint Intervals."},
   {id:"streak",label:"🔥 5-day weeks",title:"5-day week streak",value:e=>e.streak*1000+e.fiveDayWeeks*10+e.daysThisWeek,
    show:e=>`${e.streak} ${e.streak===1?"week":"weeks"}`,sub:e=>`${e.daysThisWeek} ${e.daysThisWeek===1?"day":"days"} this week${e.daysThisWeek<5?` (${5-e.daysThisWeek} to go)`:" ✓"} · ${e.fiveDayWeeks} five-day ${e.fiveDayWeeks===1?"week":"weeks"} total`,
    note:"Weeks in a row with at least 5 different days of logged workouts. This week counts once you hit day 5."},
 ];
 function Leaderboards({board,user}){
+  const units=unitsOf(user);
   const [id,setId]=useState("volume");
   const b=BOARDS.find(x=>x.id===id);
   const rows=(board||[]).filter(e=>b.value(e)>0||e.userId===user.id).sort((x,y)=>b.value(y)-b.value(x)||x.username.localeCompare(y.username));
@@ -263,13 +265,13 @@ function Leaderboards({board,user}){
         <div key={e.userId} className={`lb-row ${e.userId===user.id?"lb-me":""}`}>
           <div className={`lb-rank ${i===0?"gold":i===1?"silver":i===2?"bronze":""}`}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</div>
           <div className="lb-name" style={{minWidth:0}}>@{e.username}{e.userId===user.id?" (you)":""}{b.sub&&<div style={{fontSize:11,color:"var(--muted)",fontWeight:500}}>{b.sub(e)}</div>}</div>
-          <div className="lb-score">{b.show(e)}</div>
+          <div className="lb-score">{b.show(e,units)}</div>
         </div>
       ))}
       {me&&(!myRank||myRank>25)&&<div className="lb-row lb-me" style={{marginTop:8}}>
         <div className="lb-rank">{myRank||"–"}</div>
         <div className="lb-name">You{b.sub&&<div style={{fontSize:11,color:"var(--muted)",fontWeight:500}}>{b.sub(me)}</div>}</div>
-        <div className="lb-score">{b.show(me)}</div>
+        <div className="lb-score">{b.show(me,units)}</div>
       </div>}
       <div style={{fontSize:11,color:"var(--muted2)",marginTop:12,lineHeight:1.5}}>{b.note} Updates as members log in the Workout tab. Only members of this gym can see it.</div>
     </div>

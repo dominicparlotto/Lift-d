@@ -11,6 +11,12 @@
     <script>try{if(localStorage.getItem("liftd.theme")==="light"){document.documentElement.dataset.theme="light";document.querySelector('meta[name="theme-color"]').content="#F3F5FA";}}catch(e){}</script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Installable app (Add to Home Screen) — on iPhone, push notifications need the app opened from the Home Screen. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Lift'd" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   </head>
   <body>
     <div id="root"></div>
