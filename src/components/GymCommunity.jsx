@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "../lib/api";
-import { timeAgo } from "../utils/helpers";
+import { timeAgo, currentWeek } from "../utils/helpers";
 import { Sheet, ActionSheet, ReportSheet, BlockSheet } from "./Moderation";
 
 const backBtn={background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontSize:13,fontWeight:700,marginBottom:4,padding:0};
@@ -129,7 +129,7 @@ export function GymRoom({gymId,user,actions,onBack}){
   useEffect(()=>{const el=listRef.current;if(el)el.scrollTop=el.scrollHeight;},[messages.length,view]);
 
   useEffect(()=>{
-    if(view==="board"&&member)api.loadLeaderboard(gymId).then(setBoard).catch(e=>{console.error(e);setBoard([]);actions.flash("Couldn't load the leaderboard.");});
+    if(view==="board"&&member)api.loadLeaderboards(gymId,currentWeek()[0].key).then(setBoard).catch(e=>{console.error(e);setBoard([]);actions.flash("Couldn't load the leaderboard.");});
   },[view,gymId,member]);
 
   async function send(){
@@ -198,18 +198,7 @@ export function GymRoom({gymId,user,actions,onBack}){
           <button className="btn" style={{width:"100%"}} onClick={join} disabled={joining}>{joining?"Joining…":"Join gym"}</button>
         </div>
       ):view==="board"?(
-        <div style={{flex:1,overflow:"auto",padding:"12px 16px"}}>
-          <div className="card-title" style={{marginBottom:14}}>🏆 This week's volume (lbs)</div>
-          {board===null&&<div style={{color:"var(--muted)",fontSize:13}}>Loading…</div>}
-          {board?.map((e,i)=>(
-            <div key={e.userId} className="lb-row">
-              <div className={`lb-rank ${i===0?"gold":i===1?"silver":i===2?"bronze":""}`}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</div>
-              <div className="lb-name">@{e.username}{e.userId===user.id?" (you)":""}</div>
-              <div className="lb-score">{Math.round(e.volume).toLocaleString()} lbs</div>
-            </div>
-          ))}
-          <div style={{fontSize:11,color:"var(--muted2)",marginTop:12,lineHeight:1.5}}>Weight × reps from workouts logged in the last 7 days. Only members of this gym can see it.</div>
-        </div>
+        <Leaderboards board={board} user={user}/>
       ):(
         <div className="chat-wrap" style={{flex:1,height:"auto",minHeight:0}}>
           <div className="channels"><div className="channel-label">Channels</div>{channels.map(ch=><div key={ch.id} className={`channel-item ${channelId===ch.id?"active":""}`} onClick={()=>setChannelId(ch.id)}>#{ch.name}</div>)}<button className="add-channel-btn" onClick={()=>setShowAddCh(true)}>+ Add</button></div>
@@ -243,6 +232,46 @@ export function GymRoom({gymId,user,actions,onBack}){
         <input className="input-field" style={{width:"100%",marginBottom:14}} maxLength={30} placeholder="e.g. powerlifting" value={newCh} onChange={e=>setNewCh(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addChannel()}/>
         <button className="btn" style={{width:"100%"}} onClick={addChannel}>Create channel</button>
       </Sheet>}
+    </div>
+  );
+}
+
+// Gym competitions, all from what members log in the Workout tab. Weekly boards reset every Monday.
+const BOARDS=[
+  {id:"volume",label:"🏋️ Volume",title:"This week's volume",value:e=>e.volume,show:e=>`${Math.round(e.volume).toLocaleString()} lbs`,
+   note:"Weight × reps from every lift logged this week (Mon–Sun)."},
+  {id:"miles",label:"🏃 Miles",title:"Miles run this week",value:e=>e.miles,show:e=>`${(Math.round(e.miles*10)/10).toLocaleString()} mi`,
+   note:"Miles from runs logged this week — Running Treadmill, Running Outdoor and Sprint Intervals."},
+  {id:"streak",label:"🔥 5-day weeks",title:"5-day week streak",value:e=>e.streak*1000+e.fiveDayWeeks*10+e.daysThisWeek,
+   show:e=>`${e.streak} ${e.streak===1?"week":"weeks"}`,sub:e=>`${e.daysThisWeek} ${e.daysThisWeek===1?"day":"days"} this week${e.daysThisWeek<5?` (${5-e.daysThisWeek} to go)`:" ✓"} · ${e.fiveDayWeeks} five-day ${e.fiveDayWeeks===1?"week":"weeks"} total`,
+   note:"Weeks in a row with at least 5 different days of logged workouts. This week counts once you hit day 5."},
+];
+function Leaderboards({board,user}){
+  const [id,setId]=useState("volume");
+  const b=BOARDS.find(x=>x.id===id);
+  const rows=(board||[]).filter(e=>b.value(e)>0||e.userId===user.id).sort((x,y)=>b.value(y)-b.value(x)||x.username.localeCompare(y.username));
+  const ranked=rows.filter(e=>b.value(e)>0);
+  const me=rows.find(e=>e.userId===user.id);
+  const myRank=me&&b.value(me)>0?ranked.indexOf(me)+1:null;
+  return(
+    <div style={{flex:1,overflow:"auto",padding:"12px 16px"}}>
+      <div className="board-tabs">{BOARDS.map(x=><button key={x.id} className={`board-tab ${id===x.id?"active":""}`} onClick={()=>setId(x.id)}>{x.label}</button>)}</div>
+      <div className="card-title" style={{margin:"14px 0 10px"}}>🏆 {b.title}</div>
+      {board===null&&<div style={{color:"var(--muted)",fontSize:13}}>Loading…</div>}
+      {board&&ranked.length===0&&<div className="comment-empty">No one's on the board yet — log a workout to claim #1.</div>}
+      {ranked.slice(0,25).map((e,i)=>(
+        <div key={e.userId} className={`lb-row ${e.userId===user.id?"lb-me":""}`}>
+          <div className={`lb-rank ${i===0?"gold":i===1?"silver":i===2?"bronze":""}`}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</div>
+          <div className="lb-name" style={{minWidth:0}}>@{e.username}{e.userId===user.id?" (you)":""}{b.sub&&<div style={{fontSize:11,color:"var(--muted)",fontWeight:500}}>{b.sub(e)}</div>}</div>
+          <div className="lb-score">{b.show(e)}</div>
+        </div>
+      ))}
+      {me&&(!myRank||myRank>25)&&<div className="lb-row lb-me" style={{marginTop:8}}>
+        <div className="lb-rank">{myRank||"–"}</div>
+        <div className="lb-name">You{b.sub&&<div style={{fontSize:11,color:"var(--muted)",fontWeight:500}}>{b.sub(me)}</div>}</div>
+        <div className="lb-score">{b.show(me)}</div>
+      </div>}
+      <div style={{fontSize:11,color:"var(--muted2)",marginTop:12,lineHeight:1.5}}>{b.note} Updates as members log in the Workout tab. Only members of this gym can see it.</div>
     </div>
   );
 }

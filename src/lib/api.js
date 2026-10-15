@@ -232,6 +232,10 @@ export async function loadFriendAdds(uid) {
 }
 export const addFriend = id => supabase.from("friend_adds").insert({ friend_id: id }).then(r => { if (r.error && r.error.code !== "23505") throw r.error; });
 
+// All of a gym's boards (volume, miles, 5-day-week streaks) for the viewer's current Mon–Sun week.
+export const loadLeaderboards = (gymId, weekStart) => supabase.rpc("gym_leaderboards", { p_gym: gymId, p_week_start: weekStart }).then(check)
+  .then(rows => rows.map(r => ({ userId: r.user_id, username: r.username, name: r.name, avatar: r.avatar_url, volume: +r.volume, miles: +r.miles,
+    streak: r.streak_weeks, fiveDayWeeks: r.five_day_weeks, daysThisWeek: r.days_this_week })));
 export const loadLeaderboard = gymId => supabase.rpc("gym_leaderboard", { p_gym: gymId }).then(check)
   .then(rows => rows.map(r => ({ userId: r.user_id, username: r.username, name: r.name, avatar: r.avatar_url, volume: +r.volume })));
 

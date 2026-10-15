@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { WORKOUTS } from "../data/workouts";
+import { WORKOUTS, isDistance } from "../data/workouts";
 import WhoIsTraining from "./WhoIsTraining";
 import { ClipPlayer } from "./Reel";
 import PRShareSheet from "./PRShare";
@@ -35,11 +35,14 @@ export default function WorkoutTab({user,actions}){
   const allExercises=[...custom.map(c=>c.name),...WORKOUTS[muscleGroup].filter(e=>!custom.some(c=>c.name.toLowerCase()===e.toLowerCase()))];
   const customByName=Object.fromEntries(custom.map(c=>[c.name,c]));
   const exercises=allExercises.filter(e=>!exSearch||e.toLowerCase().includes(exSearch.toLowerCase()));
-  const blankSets=()=>[{weight:"",reps:"",done:false},{weight:"",reps:"",done:false},{weight:"",reps:"",done:false}];
-  function getSets(ex){return sets[ex]||blankSets();}
-  function editSets(ex,fn){setSets(prev=>({...prev,[ex]:fn(prev[ex]||blankSets())}));}
+  // Lifts log weight × reps (3 sets to start); runs log miles + minutes (1 run to start).
+  const blankSet=ex=>isDistance(ex)?{miles:"",minutes:"",done:false}:{weight:"",reps:"",done:false};
+  const blankSets=ex=>isDistance(ex)?[blankSet(ex)]:[blankSet(ex),blankSet(ex),blankSet(ex)];
+  function getSets(ex){return sets[ex]||blankSets(ex);}
+  function editSets(ex,fn){setSets(prev=>({...prev,[ex]:fn(prev[ex]||blankSets(ex))}));}
   function updateSet(ex,i,f,v){editSets(ex,s=>s.map((x,j)=>j===i?{...x,[f]:v}:x));}
-  function addSet(ex){editSets(ex,s=>[...s,{weight:"",reps:"",done:false}]);}
+  function addSet(ex){editSets(ex,s=>[...s,blankSet(ex)]);}
+  const filled=(ex,s)=>isDistance(ex)?!!s.miles:!!s.weight;
   // Remove a set added by mistake (always keep at least one).
   function removeSet(ex,i){editSets(ex,s=>s.length>1?s.filter((_,j)=>j!==i):s);}
   function toggleCheck(ex,i){editSets(ex,s=>s.map((x,j)=>j===i?{...x,done:!x.done}:x));}
@@ -63,8 +66,15 @@ export default function WorkoutTab({user,actions}){
   // Finishing an exercise saves its completed sets into today's workout.
   async function logWorkout(){
     if(!selectedEx||saving)return;
-    const s=getSets(selectedEx).filter(s=>s.weight&&s.reps).map(s=>({weight:parseFloat(s.weight),reps:parseInt(s.reps)}));
-    if(!s.length)return;
+    let s;
+    if(isDistance(selectedEx)){
+      s=getSets(selectedEx).filter(x=>parseFloat(x.miles)>0).map(x=>({miles:Math.round(parseFloat(x.miles)*100)/100,minutes:parseFloat(x.minutes)>0?Math.round(parseFloat(x.minutes)*10)/10:null}));
+      if(s.some(x=>x.miles>100)){actions.flash("That's more than 100 miles — check the distance.");return;}
+      if(!s.length){actions.flash("Enter how many miles you ran.");return;}
+    }else{
+      s=getSets(selectedEx).filter(x=>x.weight&&x.reps).map(x=>({weight:parseFloat(x.weight),reps:parseInt(x.reps)}));
+      if(!s.length)return;
+    }
     setSaving(true);
     const ok=await actions.logWorkout({exercise:selectedEx,group:muscleGroup,sets:s});
     setSaving(false);
@@ -138,7 +148,9 @@ export default function WorkoutTab({user,actions}){
                 <div>
                   <div className="ex-carousel" ref={carouselRef} onScroll={onCarouselScroll}>
                     {focusLog.map((w,i)=>{
+                      const run=w.sets.some(s=>s.miles!=null);
                       const top=Math.max(...w.sets.map(s=>parseFloat(s.weight)||0));
+                      const miles=w.sets.reduce((a,s)=>a+(parseFloat(s.miles)||0),0), mins=w.sets.reduce((a,s)=>a+(parseFloat(s.minutes)||0),0);
                       return(
                         <div className="ex-slide" key={i}>
                           <div className="ex-slide-card">
@@ -147,11 +159,12 @@ export default function WorkoutTab({user,actions}){
                               <span className="tag">{w.group}</span>
                             </div>
                             <div style={{fontSize:20,fontWeight:800,letterSpacing:"-0.3px",marginBottom:3}}>{w.exercise}</div>
-                            <div style={{fontSize:12,color:"var(--accent3)",fontWeight:600,marginBottom:16}}>Top set {top} lbs · {setVolume(w.sets).toLocaleString()} lbs volume</div>
+                            <div style={{fontSize:12,color:"var(--accent3)",fontWeight:600,marginBottom:16}}>{run?`${Math.round(miles*100)/100} miles${mins?` · ${Math.round(mins)} min`:""}`:`Top set ${top} lbs · ${setVolume(w.sets).toLocaleString()} lbs volume`}</div>
                             {w.sets.map((s,j)=>(
                               <div key={j} className="set-line">
-                                <span className="set-line-num">Set {j+1}</span>
-                                <span className="set-line-val">{s.weight} lbs <span style={{color:"var(--muted)"}}>×</span> {s.reps} reps</span>
+                                <span className="set-line-num">{run?`Run ${j+1}`:`Set ${j+1}`}</span>
+                                {run?<span className="set-line-val">{s.miles} mi{s.minutes?<><span style={{color:"var(--muted)"}}> · </span>{s.minutes} min</>:null}</span>
+                                  :<span className="set-line-val">{s.weight} lbs <span style={{color:"var(--muted)"}}>×</span> {s.reps} reps</span>}
                               </div>
                             ))}
                           </div>
@@ -230,12 +243,12 @@ export default function WorkoutTab({user,actions}){
           {exercises.map(ex=>{const mine=customByName[ex];return(
             <div key={ex}>
               <div className={`exercise-row ${selectedEx===ex?"selected":""}`} onClick={()=>{setSelectedEx(selectedEx===ex?null:ex);setConfirmRemove(null);}}>
-                <div style={{minWidth:0}}><div className="exercise-name">{ex}{mine&&<span className="custom-ex-tag">Yours</span>}</div><div className="exercise-sets">{getSets(ex).filter(s=>s.weight).length} sets logged</div></div>
+                <div style={{minWidth:0}}><div className="exercise-name">{ex}{mine&&<span className="custom-ex-tag">Yours</span>}</div><div className="exercise-sets">{getSets(ex).filter(s=>filled(ex,s)).length} {isDistance(ex)?"runs":"sets"} logged</div></div>
                 {formClip(ex)&&<button className="form-btn" onClick={e=>{e.stopPropagation();setPlaying(formClip(ex));}} aria-label={`Watch ${ex} form clip`}>▶ Form</button>}
                 {mine&&<button className={`custom-ex-remove ${confirmRemove===mine.id?"confirm":""}`} onClick={e=>{e.stopPropagation();removeExercise(mine);}}>{confirmRemove===mine.id?"Remove?":"✕"}</button>}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><polyline points={selectedEx===ex?"18 15 12 9 6 15":"6 9 12 15 18 9"}/></svg>
               </div>
-              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><div style={{display:"flex",gap:6}}>{formClip(ex)&&<button className="add-set-btn" onClick={()=>setPlaying(formClip(ex))}>▶ Form</button>}<button className="add-set-btn" onClick={()=>addSet(ex)}>+ Set</button></div></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div><input className="set-input" inputMode="decimal" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div><button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
+              {selectedEx===ex&&<div className="set-logger"><div className="set-logger-header"><span>{ex}</span><div style={{display:"flex",gap:6}}>{formClip(ex)&&<button className="add-set-btn" onClick={()=>setPlaying(formClip(ex))}>▶ Form</button>}<button className="add-set-btn" onClick={()=>addSet(ex)}>{isDistance(ex)?"+ Run":"+ Set"}</button></div></div>{getSets(ex).map((s,i,all)=><div key={i} className="set-row"><div className="set-num">{i+1}</div>{isDistance(ex)?<><input className="set-input" inputMode="decimal" placeholder="miles" value={s.miles} onChange={e=>updateSet(ex,i,"miles",e.target.value.replace(/[^0-9.]/g,""))} aria-label="Miles"/><input className="set-input" inputMode="decimal" placeholder="min" value={s.minutes} onChange={e=>updateSet(ex,i,"minutes",e.target.value.replace(/[^0-9.]/g,""))} aria-label="Minutes"/><div className="set-label">miles · minutes</div></>:<><input className="set-input" inputMode="decimal" placeholder="lbs" value={s.weight} onChange={e=>updateSet(ex,i,"weight",e.target.value)}/><input className="set-input" inputMode="numeric" placeholder="reps" value={s.reps} onChange={e=>updateSet(ex,i,"reps",e.target.value)}/><div className="set-label">weight × reps</div></>}<button className={`set-done ${s.done?"checked":""}`} onClick={()=>toggleCheck(ex,i)} aria-label={`Mark set ${i+1} done`}>✓</button>{all.length>1&&<button className="set-remove" onClick={()=>removeSet(ex,i)} aria-label={`Delete set ${i+1}`}>✕</button>}</div>)}<div style={{padding:"12px 16px"}}><button className="btn" style={{width:"100%"}} onClick={logWorkout} disabled={saving}>{saving?"Saving…":"Save Exercise to Today"}</button></div></div>}
             </div>
           );})}
           {exercises.length===0&&<div style={{padding:"24px 20px",textAlign:"center",color:"var(--muted)",fontSize:14}}>No exercises found for "{exSearch}" — add it above.</div>}

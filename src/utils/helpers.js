@@ -17,7 +17,7 @@ export const setVolume=s=>s.reduce((a,x)=>a+(parseFloat(x.weight)||0)*(parseInt(
 // Heaviest set per exercise across every logged day.
 export function bestSets(workouts){
   const best={};
-  Object.entries(workouts||{}).forEach(([key,day])=>(day||[]).forEach(w=>w.sets.forEach(s=>{const wt=parseFloat(s.weight)||0;if(!best[w.exercise]||wt>best[w.exercise].weight)best[w.exercise]={weight:wt,reps:parseInt(s.reps)||0,dateKey:key};})));
+  Object.entries(workouts||{}).forEach(([key,day])=>(day||[]).forEach(w=>w.sets.forEach(s=>{if(s.miles!=null)return; /* runs aren't lifting PRs */ const wt=parseFloat(s.weight)||0;if(!best[w.exercise]||wt>best[w.exercise].weight)best[w.exercise]={weight:wt,reps:parseInt(s.reps)||0,dateKey:key};})));
   return best;
 }
 // Lifetime numbers derived from the workout log (drives profile stats + badges).

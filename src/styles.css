@@ -457,3 +457,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .search-post img,.search-post-icon{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--glass);font-size:18px;}
 
 .search-container .search-input{padding-right:64px;}
+/* Gym leaderboards */
+.board-tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
+.board-tab{flex:1;white-space:nowrap;padding:8px 10px;border-radius:12px;border:1px solid var(--border);background:var(--glass);color:var(--muted);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;}
+.board-tab.active{background:rgba(79,142,247,0.14);border-color:rgba(79,142,247,0.45);color:var(--accent);}
+.lb-me{background:rgba(79,142,247,0.08);border-radius:12px;padding-left:8px;padding-right:8px;}

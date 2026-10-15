@@ -10,3 +10,8 @@ export const WORKOUTS = {
   "Olympic":["Power Clean","Hang Power Clean","Power Snatch","Hang Power Snatch","Clean and Jerk","Full Snatch","Push Jerk","Split Jerk","Overhead Squat","Thruster","Push Press"],
   "Stretch":["Hip Flexor Stretch","Pigeon Pose","Hamstring Stretch","Quad Stretch","Calf Stretch","Chest Opener","Thoracic Rotation","Childs Pose","Downward Dog","Cat-Cow","Worlds Greatest Stretch","90/90 Hip Stretch","Couch Stretch","Foam Roll Quads","Foam Roll IT Band","Arm Circles","Foam Roll Upper Back"],
 };
+
+// Running exercises are logged as distance + time ({miles, minutes}) instead of weight × reps;
+// they count toward each gym's "miles run" leaderboard.
+export const DISTANCE_EXERCISES=new Set(["Running Treadmill","Running Outdoor","Sprint Intervals"]);
+export const isDistance=name=>DISTANCE_EXERCISES.has(name);
