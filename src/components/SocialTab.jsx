@@ -13,7 +13,6 @@ const clipKey=item=>item.kind==="curated"?item.key:`post:${item.id}`;
 export default function SocialTab({user,posts,actions,onGoToProfile}){
   const [liked,setLiked]=useState({});
   const [saved,setSaved]=useState({});
-  const [boosted,setBoosted]=useState({});
   const [view,setView]=useState("feed");
   const [searchQ,setSearchQ]=useState("");
   const [clips,setClips]=useState(null); // null = not loaded yet
@@ -87,7 +86,6 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
             return <FeedCard key={post.feedKey} item={post} user={user} actions={actions} muted={feedMuted} onToggleMute={()=>setFeedMuted(m=>!m)}
               liked={!!liked[key]} onLike={()=>setLiked(p=>({...p,[key]:!p[key]}))}
               saved={clipLike?user.savedClips.includes(key):!!saved[key]} onSave={()=>clipLike?actions.toggleSaveClip(key):setSaved(p=>({...p,[key]:!p[key]}))}
-              boosted={!!boosted[key]} onBoost={()=>setBoosted(p=>({...p,[key]:!p[key]}))}
               comments={countFor(post)} onComments={()=>setCommentsFor(post)} onMenu={()=>setPostMenu(post)} onWatch={()=>watchInClips(key)} onOpenProfile={openProfile}/>;
           })}
         </div>
@@ -106,7 +104,7 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
 // One post in the Feed, laid out like Instagram: header, media, actions, caption, comments.
 // Videos (members' clips and Lift'd Learn clips) use the same frame, crop and coaching cues as the Clips view,
 // play muted while on screen, and open in Clips when tapped.
-function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSave,boosted,onBoost,comments,onComments,onMenu,onWatch,onOpenProfile}){
+function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSave,comments,onComments,onMenu,onWatch,onOpenProfile}){
   const curated=item.kind==="curated";
   const a=item.author;
   const reel=curated?item:item.mediaType==="video"&&item.mediaUrl?{key:`post:${item.id}`,kind:"community",id:item.id,videoUrl:item.mediaUrl,cues:[],focusX:50,cuePosition:"bottom"}:null;
@@ -156,10 +154,6 @@ function FeedCard({item,user,actions,muted,onToggleMute,liked,onLike,saved,onSav
           {liked?1:0}
         </button>
         <button className="action-btn" onClick={onComments} aria-label="Comments"><CommentIcon size={18}/>{comments}</button>
-        {!curated&&<button className={`action-btn ${boosted?"boosted":""}`} onClick={onBoost}>
-          <span style={{fontSize:14}}>⚡</span>
-          {boosted?"Boosted!":"Boost"}
-        </button>}
         <button className="action-btn" aria-label="Share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
         <button className={`action-btn ${saved?"saved":""}`} style={{marginLeft:"auto"}} onClick={onSave} aria-label={saved?"Saved":"Save"}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill={saved?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>

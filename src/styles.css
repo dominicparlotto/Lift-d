@@ -122,7 +122,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .action-btn{display:flex;align-items:center;gap:5px;background:none;border:none;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;padding:4px 0;transition:color 0.2s;}
 .action-btn.liked{color:#FF7A6E;}
 .action-btn.saved{color:#FFD700;}
-.action-btn.boosted{color:#FF8C00;}
 .action-btn:hover{color:var(--text);}
 .upload-area{border:2px dashed var(--border2);border-radius:16px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:14px;}
 .upload-area:hover{border-color:var(--accent);background:rgba(79,142,247,0.05);}
