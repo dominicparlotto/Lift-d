@@ -6,6 +6,7 @@ import { PASSWORD_RULES } from "../utils/validation";
 import { useUsernameStatus } from "./AuthScreen";
 import PasswordInput from "./PasswordInput";
 import { FeedbackSheet, FeedbackInbox } from "./Feedback";
+import ReportsInbox from "./Reports";
 import PRShareSheet from "./PRShare";
 import { getTheme, setTheme } from "../utils/theme";
 import { pushSupport, isPushOn, enablePush, disablePush } from "../lib/push";
@@ -15,12 +16,13 @@ import NewPostSheet from "./NewPostSheet";
 import { PostGrid, PostViewer } from "./Profiles";
 import { ClipPlayer } from "./Reel";
 import { initials, timeAgo, shortDate, dateKey, currentWeek, bestSets, trainingStats, squareImageDataUrl } from "../utils/helpers";
+import { hasProfanity, PROFANITY_MESSAGE } from "../utils/profanity";
 
 const avatarImg={width:"100%",height:"100%",borderRadius:"50%",objectFit:"cover",display:"block"};
 const fieldLabel={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted)",marginBottom:6};
 const chevron=<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>;
 
-export default function ProfileTab({user,actions}){
+export default function ProfileTab({user,actions,startSheet,onStartHandled}){
   const [tab,setTab]=useState("posts");
   // Push notifications for this device (real Web Push; see src/lib/push.js).
   const [push,setPush]=useState({on:false,busy:false,support:pushSupport()});
@@ -31,6 +33,9 @@ export default function ProfileTab({user,actions}){
   const [dark,setDark]=useState(()=>getTheme()==="dark");
   const [cardPR,setCardPR]=useState(null); // PR being turned into a shareable image
   const [showFeedback,setShowFeedback]=useState(false); const [showInbox,setShowInbox]=useState(false);
+  const [showReports,setShowReports]=useState(false);
+  // Opened from a report notification / #reports link.
+  useEffect(()=>{if(startSheet==="reports"){if(user.isAdmin)setShowReports(true);onStartHandled?.();}},[startSheet]);
   const units=unitsOf(user);
   const [sharedPR,setSharedPR]=useState({});
   const [showEdit,setShowEdit]=useState(false);
@@ -146,8 +151,13 @@ export default function ProfileTab({user,actions}){
         <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div><div className="settings-sub">{dark?"On":"Off — light mode"}</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>{setDark(e.target.checked);setTheme(e.target.checked?"dark":"light");}}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>actions.saveNutrition({...user.nutrition,units:units==="imperial"?"metric":"imperial"})}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs · mi · ft":"kg · km · cm"}</span>{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Support</div><div className="settings-list">
           <div className="settings-row" onClick={()=>setShowFeedback(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>💬</div><div><div className="settings-label">Send Feedback</div><div className="settings-sub">Report a bug or suggest an idea</div></div></div><div className="settings-right">{chevron}</div></div>
-          {user.isAdmin&&<div className="settings-row" onClick={()=>setShowInbox(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📥</div><div><div className="settings-label">Feedback Inbox</div><div className="settings-sub">Admin · read what people sent</div></div></div><div className="settings-right">{chevron}</div></div>}
+          <a className="settings-row" href="https://joinliftd.com/terms/" target="_blank" rel="noopener" style={{textDecoration:"none",color:"inherit"}}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>📄</div><div><div className="settings-label">Terms of Use</div></div></div><div className="settings-right">{chevron}</div></a>
+          <a className="settings-row" href="https://joinliftd.com/privacy/" target="_blank" rel="noopener" style={{textDecoration:"none",color:"inherit"}}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🛡️</div><div><div className="settings-label">Privacy Policy</div></div></div><div className="settings-right">{chevron}</div></a>
         </div></div>
+        {user.isAdmin&&<div className="settings-section"><div className="settings-section-label">Admin</div><div className="settings-list">
+          <div className="settings-row" onClick={()=>setShowReports(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(255,122,110,0.15)"}}>🚩</div><div><div className="settings-label">Reports</div><div className="settings-sub">Remove content or ban accounts</div></div></div><div className="settings-right">{chevron}</div></div>
+          <div className="settings-row" onClick={()=>setShowInbox(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📥</div><div><div className="settings-label">Feedback Inbox</div><div className="settings-sub">Read what people sent</div></div></div><div className="settings-right">{chevron}</div></div>
+        </div></div>}
         <div style={{padding:"0 16px 12px"}}><button className="btn-outline" style={{width:"100%",padding:"13px",marginBottom:10}} onClick={actions.signOut}>Sign Out</button></div>
         <div style={{padding:"0 16px 32px"}}><button className="btn-danger" onClick={()=>setShowDelete(true)}>Delete Account</button></div>
       </div>)}
@@ -169,6 +179,7 @@ export default function ProfileTab({user,actions}){
       </Sheet>}
       {cardPR&&<PRShareSheet pr={cardPR} units={units} user={user} actions={actions} onClose={()=>setCardPR(null)}/>}
       {showFeedback&&<FeedbackSheet actions={actions} onClose={()=>setShowFeedback(false)}/>}
+      {showReports&&<ReportsInbox actions={actions} onClose={()=>setShowReports(false)}/>}
       {showInbox&&<FeedbackInbox actions={actions} onClose={()=>setShowInbox(false)}/>}
       {showEdit&&<EditProfileModal user={user} onClose={()=>setShowEdit(false)} onSave={async(fields,avatar)=>{if(await actions.updateProfile(fields,avatar))setShowEdit(false);}}/>}
       {showPassword&&<ChangePasswordModal onClose={()=>setShowPassword(false)} onSave={actions.changePassword}/>}
@@ -195,6 +206,7 @@ function EditProfileModal({user,onSave,onClose}){
   }
   async function save(){
     if(!form.name.trim()){setErr("Name is required.");return;}
+    if(hasProfanity(form.name,true)||hasProfanity(form.bio)){setErr(PROFANITY_MESSAGE);return;}
     if(unameBad){setErr(unameStatus.message+".");return;}
     if(unameStatus.state==="checking"){setErr("Still checking that username — try again in a second.");return;}
     setSaving(true);setErr("");

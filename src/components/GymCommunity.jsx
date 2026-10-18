@@ -3,6 +3,7 @@ import * as api from "../lib/api";
 import { timeAgo, currentWeek } from "../utils/helpers";
 import { unitsOf, fmtW, fmtD } from "../utils/units";
 import { Sheet, ActionSheet, ReportSheet, BlockSheet } from "./Moderation";
+import { hasProfanity, isProfanityError, PROFANITY_MESSAGE } from "../utils/profanity";
 
 const backBtn={background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontSize:13,fontWeight:700,marginBottom:4,padding:0};
 const plural=(n,word)=>`${n} ${word}${n===1?"":"s"}`;
@@ -42,9 +43,10 @@ export function GymList({user,actions,onOpen}){
   }
   async function create(){
     if(name.trim().length<2){setCreateErr("Enter your gym's name.");return;}
+    if(hasProfanity(name,true)||hasProfanity(location)){setCreateErr(PROFANITY_MESSAGE);return;}
     setCreating(true);setCreateErr("");
     try{const id=await api.createGym(name.trim(),location.trim());onOpen(id);}
-    catch(e){console.error(e);setCreateErr("Couldn't create the gym — try again.");setCreating(false);}
+    catch(e){console.error(e);setCreateErr(isProfanityError(e)?PROFANITY_MESSAGE:"Couldn't create the gym — try again.");setCreating(false);}
   }
 
   return(
@@ -136,20 +138,22 @@ export function GymRoom({gymId,user,actions,onBack}){
   async function send(){
     const text=input.trim();
     if(!text||sending||!channelId)return;
+    if(hasProfanity(text)){actions.flash(PROFANITY_MESSAGE);return;}
     setSending(true);
     try{
       const m=await api.sendMessage(channelId,text);
       profiles.current[m.authorId]=m.author;
       setMessages(list=>list.some(x=>x.id===m.id)?list:[...list,m]);
       setInput("");
-    }catch(e){console.error(e);actions.flash("Couldn't send — check your connection.");}
+    }catch(e){console.error(e);actions.flash(isProfanityError(e)?PROFANITY_MESSAGE:"Couldn't send — check your connection.");}
     setSending(false);
   }
   async function addChannel(){
     const name=newCh.trim().toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"").slice(0,30);
     if(!name){setChErr("Use letters, numbers and dashes.");return;}
+    if(hasProfanity(name,true)){setChErr(PROFANITY_MESSAGE);return;}
     try{const ch=await api.createChannel(gymId,name);setChannels(c=>[...c,ch]);setChannelId(ch.id);setNewCh("");setChErr("");setShowAddCh(false);}
-    catch(e){setChErr(e?.code==="23505"?"That channel already exists.":"Couldn't create the channel — try again.");}
+    catch(e){setChErr(e?.code==="23505"?"That channel already exists.":isProfanityError(e)?PROFANITY_MESSAGE:"Couldn't create the channel — try again.");}
   }
   async function join(){
     setJoining(true);

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Sheet } from "./Moderation";
+import { hasProfanity, PROFANITY_MESSAGE } from "../utils/profanity";
 
 const MAX_MB=50, MAX_VIDEO_SECONDS=180;
 
@@ -32,6 +33,7 @@ export default function NewPostSheet({user,actions,onClose,onPosted}){
   async function submit(){
     if(posting)return;
     if(!caption.trim()){setErr("Add a caption.");return;}
+    if(hasProfanity(caption)){setErr(PROFANITY_MESSAGE);return;}
     setPosting(true);setErr("");
     const ok=await actions.createPost({content:caption.trim(),file,muscle});
     setPosting(false);

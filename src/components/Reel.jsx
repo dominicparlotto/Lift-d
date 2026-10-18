@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import * as api from "../lib/api";
 import { timeAgo } from "../utils/helpers";
 import { Sheet, Avatar, ReportSheet } from "./Moderation";
+import { hasProfanity, isProfanityError, PROFANITY_MESSAGE } from "../utils/profanity";
 
 // Pieces shared by the full-screen Clips view and clip cards in the Feed, so a clip looks the same in both.
 
@@ -70,13 +71,14 @@ export function CommentsSheet({item,user,actions,onClose,onCount}){
   async function post(){
     const content=text.trim();
     if(!content||busy)return;
+    if(hasProfanity(content)){actions.flash(PROFANITY_MESSAGE);return;}
     setBusy(true);
     try{
       const saved=await api.addComment(item,content);
       const next=[...(comments||[]),saved];
       setComments(next);onCount(next.length);setText("");
       setTimeout(()=>listRef.current?.scrollTo({top:listRef.current.scrollHeight,behavior:"smooth"}),0);
-    }catch(e){console.error(e);actions.flash("Couldn't post your comment — try again.");}
+    }catch(e){console.error(e);actions.flash(isProfanityError(e)?PROFANITY_MESSAGE:"Couldn't post your comment — try again.");}
     setBusy(false);
   }
   async function remove(c){

@@ -4,6 +4,9 @@ import { supabase } from "../lib/supabase";
 import { isUsernameAvailable } from "../lib/api";
 import { PASSWORD_RULES, validateUsername, friendlyAuthError } from "../utils/validation";
 import PasswordInput from "./PasswordInput";
+import { hasProfanity, PROFANITY_MESSAGE } from "../utils/profanity";
+
+export const TERMS_URL="https://joinliftd.com/terms/", PRIVACY_URL="https://joinliftd.com/privacy/";
 
 // Logo mark lives at the site root (public/favicon.svg); the app is served from /app/, so it's one level up.
 const LOGO="../favicon.svg";
@@ -41,7 +44,7 @@ export default function AuthScreen(){
   const [mode,setMode]=useState(()=>({"#signup":"signup","#signin":"signin"})[window.location.hash]||"splash");
   const [email,setEmail]=useState(""); const [pass,setPass]=useState("");
   const [name,setName]=useState(""); const [username,setUsername]=useState("");
-  const [skill,setSkill]=useState("");
+  const [skill,setSkill]=useState(""); const [agreed,setAgreed]=useState(false);
   const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const usernameStatus=useUsernameStatus(username);
   const passValid=PASSWORD_RULES.every(r=>r.test(pass));
@@ -58,6 +61,7 @@ export default function AuthScreen(){
   function continueToCredentials(){
     if(!name.trim()||!email.trim()){setErr("Fill in all fields.");return;}
     if(!/^\S+@\S+\.\S+$/.test(email.trim())){setErr("Enter a valid email address.");return;}
+    if(hasProfanity(name,true)){setErr(PROFANITY_MESSAGE);return;}
     go("signup-credentials");
   }
   async function signUp(){
@@ -65,11 +69,12 @@ export default function AuthScreen(){
     if(usernameStatus.state==="invalid"){setErr(usernameStatus.message);return;}
     if(usernameStatus.state==="taken"){setErr("That username is already taken.");return;}
     if(!passValid){setErr("Password does not meet all requirements.");return;}
+    if(!agreed){setErr("Please confirm you're 13 or older and agree to the Terms of Use and Privacy Policy.");return;}
     setLoading(true);setErr("");
     try{
       if(!await isUsernameAvailable(username)){setLoading(false);setErr("That username is already taken.");return;}
       const {data,error}=await supabase.auth.signUp({email:email.trim(),password:pass,options:{
-        data:{username:username.trim(),name:name.trim(),skill:skill||"Beginner"},
+        data:{username:username.trim(),name:name.trim(),skill:skill||"Beginner",terms_accepted_at:new Date().toISOString()},
         emailRedirectTo:appUrl(),
       }});
       setLoading(false);
@@ -168,8 +173,11 @@ export default function AuthScreen(){
             <PasswordInput className="auth-input" autoComplete="new-password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)}/>
             <PasswordChecklist pass={pass}/>
           </div>
+          <label className="auth-agree">
+            <input type="checkbox" checked={agreed} onChange={e=>{setAgreed(e.target.checked);setErr("");}}/>
+            <span>I'm 13 or older and agree to the <a href={TERMS_URL} target="_blank" rel="noopener">Terms of Use</a> and <a href={PRIVACY_URL} target="_blank" rel="noopener">Privacy Policy</a>. Lift'd has zero tolerance for abusive or objectionable content.</span>
+          </label>
           <button className="auth-btn" onClick={signUp} disabled={loading}>{loading?"Creating…":"Create Account"}</button>
-          <div className="auth-terms">By signing up you agree to our <span style={{color:"var(--accent)"}}>Terms</span> and <span style={{color:"var(--accent)"}}>Privacy Policy</span>.</div>
         </div>
       </div>
       <div className="auth-footer">Already have an account? <button onClick={()=>go("signin")}>Sign In</button></div>

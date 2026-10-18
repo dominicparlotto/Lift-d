@@ -11,6 +11,7 @@ import * as api from "./lib/api";
 import { dateKey } from "./utils/helpers";
 import { friendlyAuthError } from "./utils/validation";
 import { disablePush } from "./lib/push";
+import { isProfanityError, PROFANITY_MESSAGE } from "./utils/profanity";
 
 const shell={maxWidth:430,margin:"0 auto",height:"100vh",overflow:"auto",background:"var(--bg)"};
 
@@ -35,8 +36,8 @@ export default function App(){
     window.addEventListener("hashchange",onHash);
     return ()=>window.removeEventListener("hashchange",onHash);
   },[]);
-  // Share links and push notifications open a specific thing: #post=ID, #clip=ID, #user=ID, #requests.
-  const readLink=()=>{const m=window.location.hash.match(/^#(post|clip|user)=([0-9a-f-]{36})$/i);return m?{type:m[1],id:m[2]}:window.location.hash==="#requests"?{type:"requests"}:null;};
+  // Share links and push notifications open a specific thing: #post=ID, #clip=ID, #user=ID, #requests, #reports (admins).
+  const readLink=()=>{const m=window.location.hash.match(/^#(post|clip|user)=([0-9a-f-]{36})$/i);return m?{type:m[1],id:m[2]}:/^#(requests|reports)$/.test(window.location.hash)?{type:window.location.hash.slice(1)}:null;};
   const [deepLink,setDeepLink]=useState(()=>{
     const l=readLink();
     try{if(l)sessionStorage.setItem("liftd.link",JSON.stringify(l));return l||JSON.parse(sessionStorage.getItem("liftd.link")||"null");}
@@ -50,7 +51,7 @@ export default function App(){
   function clearDeepLink(){
     setDeepLink(null);
     try{sessionStorage.removeItem("liftd.link");}catch{/* storage unavailable */}
-    if(/^#(post|clip|user)=|^#requests$/.test(window.location.hash))window.history.replaceState(null,"",window.location.pathname);
+    if(/^#(post|clip|user)=|^#(requests|reports)$/.test(window.location.hash))window.history.replaceState(null,"",window.location.pathname);
   }
   // Unread notifications (🔔 badge), kept live.
   const [unread,setUnread]=useState(0);
@@ -89,10 +90,13 @@ export default function App(){
     refreshUnread();
     return api.subscribeToNotifications(user.id,refreshUnread);
   },[user?.id]);
-  // A share/notification link opens the Feed (posts, clips, people) or your Profile (follow requests).
+  // A share/notification link opens the Feed (posts, clips, people) or your Profile (follow requests, admin reports).
+  const [profileSheet,setProfileSheet]=useState(null); // "reports" → Profile opens the Reports inbox
+  function openReports(){setProfileSheet("reports");setTab("profile");}
   useEffect(()=>{
     if(!user||!deepLink)return;
     if(deepLink.type==="requests"){setTab("profile");clearDeepLink();}
+    else if(deepLink.type==="reports"){if(user.isAdmin)openReports();clearDeepLink();}
     else setTab("social");
   },[user?.id,deepLink]);
   // Likes: shown instantly; overrides[key] is what the user has toggled since the item was loaded.
@@ -105,7 +109,7 @@ export default function App(){
   // Runs a save; on failure shows a message and returns false so the screen can keep the user's input.
   async function attempt(fn,fail="Couldn't save — check your connection and try again."){
     try{await fn();return true;}
-    catch(e){console.error(e);flash(typeof fail==="function"?fail(e):fail);return false;}
+    catch(e){console.error(e);flash(isProfanityError(e)?PROFANITY_MESSAGE:typeof fail==="function"?fail(e):fail);return false;}
   }
   const patch=fn=>setUser(u=>u&&{...u,...fn(u)});
 
@@ -133,7 +137,7 @@ export default function App(){
       }
     },
     unread,setUnread,refreshUnread,
-    deepLink,clearDeepLink,
+    deepLink,clearDeepLink,openReports,
     logWorkout:entry=>attempt(async()=>{
       const day=dateKey();const saved=await api.insertWorkout(day,entry);
       patch(u=>({workouts:{...u.workouts,[day]:[...(u.workouts[day]||[]),saved]}}));
@@ -266,7 +270,7 @@ export default function App(){
         {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions} onGoToProfile={()=>setTab("profile")}/>}
         {tab==="community"&&<CommunityTab user={user} actions={actions} joinCode={joinCode} onJoinHandled={clearJoinCode}/>}
         {tab==="workout"&&<WorkoutTab user={user} actions={actions}/>}
-        {tab==="profile"&&<ProfileTab user={user} actions={actions}/>}
+        {tab==="profile"&&<ProfileTab user={user} actions={actions} startSheet={profileSheet} onStartHandled={()=>setProfileSheet(null)}/>}
       </div>
       {toast&&<div className="toast" role="status">{toast}</div>}
       <nav className="nav">{tabs.map(t=><button key={t.id} className={`nav-btn ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}><span className="nav-icon-wrap">{t.icon}{t.id==="social"&&unread>0&&<span className="nav-badge" aria-label={`${unread} new notifications`}>{unread>9?"9+":unread}</span>}</span>{t.label}<div className="nav-bar"/></button>)}</nav>

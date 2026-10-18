@@ -120,6 +120,7 @@ export default function GoalSettings({nutrition,initialTab="stats",onSave,onClos
             );})}
           </div>
           <div className="field-hint" style={{marginTop:10}}>These are estimates — real needs vary by a few hundred calories. If your weight isn't moving the way you want after 2–3 weeks, adjust or set custom targets.</div>
+          <div className="field-hint" style={{marginTop:6}}>Not medical advice. Check with a doctor or registered dietitian before big changes — especially if you're pregnant, under 18, or managing a health condition.</div>
         </div>:typed?<div className="field-hint" style={{marginBottom:4}}>Still needed: {missing.join(", ")}.</div>:null}
       </>:<>
         <div style={{fontSize:13,color:"var(--muted)",marginBottom:14,lineHeight:1.5}}>Following a coach's plan or your own numbers? Set exactly what you want to hit each day.</div>

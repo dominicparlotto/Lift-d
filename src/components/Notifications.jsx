@@ -9,6 +9,7 @@ const TEXT={
   follow:"started following you.",
   follow_request:"wants to follow you.",
   follow_accepted:"accepted your follow request.",
+  report:"filed a report",
 };
 
 // The 🔔 inbox: likes, comments, new followers, follow requests (approve/decline right here), approvals.
@@ -26,7 +27,8 @@ export default function NotificationsSheet({user,actions,onClose,onOpenPost,onOp
   },[]);
 
   async function open(n){
-    if(n.postId){
+    if(n.type==="report"){onClose();actions.openReports();}
+    else if(n.postId){
       const post=await api.loadPost(n.postId).catch(()=>null);
       if(post){onClose();onOpenPost(post);}else actions.flash("That post isn't available anymore.");
     }else if(n.type==="follow_request")onGoToProfile();
@@ -47,7 +49,7 @@ export default function NotificationsSheet({user,actions,onClose,onOpenPost,onOp
           <div key={n.id} className={`notif ${n.read?"":"unread"}`} role="button" tabIndex={0} onClick={()=>open(n)} onKeyDown={e=>{if(e.key==="Enter")open(n);}}>
             <Avatar profile={n.actor} size={38}/>
             <div style={{flex:1,minWidth:0}}>
-              <div className="notif-text"><strong>@{n.actor.username}</strong> {TEXT[n.type]}{n.type==="comment"&&n.body&&<span> “{n.body}”</span>} <span className="notif-time">{timeAgo(n.createdAt)}</span></div>
+              <div className="notif-text"><strong>@{n.actor.username}</strong> {TEXT[n.type]}{n.type==="comment"&&n.body&&<span> “{n.body}”</span>}{n.type==="report"&&<span> ({n.body?.replace(/_/g," ")}) — tap to review.</span>} <span className="notif-time">{timeAgo(n.createdAt)}</span></div>
               {n.type==="follow_request"&&(answered[n.id]
                 ?<div className="notif-time" style={{marginTop:4}}>{answered[n.id]}</div>
                 :<div style={{display:"flex",gap:6,marginTop:6}} onClick={e=>e.stopPropagation()}>

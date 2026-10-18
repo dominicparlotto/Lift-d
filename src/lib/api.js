@@ -379,3 +379,23 @@ export async function savePushSubscription(sub) {
 }
 export const deletePushSubscription = endpoint => supabase.from("push_subscriptions").delete().eq("endpoint", endpoint).then(check);
 export const hasPushSubscription = endpoint => supabase.from("push_subscriptions").select("id").eq("endpoint", endpoint).maybeSingle().then(check).then(r => !!r);
+
+// Admin moderation (Settings → Reports). The RPCs refuse anyone who isn't an admin.
+export async function adminReports(status = "open") {
+  const rows = check(await supabase.rpc("admin_reports", { p_status: status }));
+  return rows.map(r => ({
+    id: r.id, createdAt: Date.parse(r.created_at), status: r.status, reason: r.reason, details: r.details,
+    targetType: r.target_type, targetId: r.target_id, reporter: r.reporter_username,
+    targetUserId: r.target_user_id, targetUsername: r.target_username, targetName: r.target_name, targetBanned: r.target_banned,
+    preview: r.preview, mediaType: r.media_type, mediaUrl: r.media_url, contentGone: r.content_gone, reportCount: +r.reports_on_target,
+  }));
+}
+// action: "dismiss" | "remove" | "ban" | "remove_ban". Removing a post also deletes its photo/video file.
+export async function resolveReport(id, action) {
+  const res = check(await supabase.rpc("admin_resolve_report", { p_report: id, p_action: action }));
+  if (res?.media_path) await removePostMedia(res.media_path).catch(e => console.error("couldn't remove media", e));
+  return res;
+}
+export const adminBannedUsers = () => supabase.rpc("admin_banned_users").then(check)
+  .then(rows => rows.map(r => ({ id: r.id, username: r.username, name: r.name, avatar: r.avatar_url, bannedAt: Date.parse(r.banned_at) })));
+export const adminUnban = id => supabase.rpc("admin_unban", { p_user: id }).then(check);
