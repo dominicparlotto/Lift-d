@@ -350,19 +350,54 @@ export async function loadPost(id) {
 }
 
 // ---------- Notifications (inbox; also pushed to devices that turned push on) ----------
+// "dm" notifications exist only to send the push for a direct message — they never show in the 🔔 inbox.
 const toNotification = n => ({ id: n.id, type: n.type, body: n.body, postId: n.post_id, createdAt: Date.parse(n.created_at), read: !!n.read_at,
   actor: n.actor ? toProfile(n.actor) : null, post: n.post ? { id: n.post.id, content: n.post.content, mediaType: n.post.media_type, mediaUrl: n.post.media_url } : null });
 export async function loadNotifications() {
-  const rows = check(await supabase.from("notifications").select("*, actor:profiles!notifications_actor_id_fkey(*), post:posts(id, content, media_type, media_url)").order("created_at", { ascending: false }).limit(60));
+  const rows = check(await supabase.from("notifications").select("*, actor:profiles!notifications_actor_id_fkey(*), post:posts(id, content, media_type, media_url)").neq("type", "dm").order("created_at", { ascending: false }).limit(60));
   return rows.filter(n => n.actor).map(toNotification);
 }
 export const countUnreadNotifications = () =>
-  supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null).then(r => { if (r.error) throw r.error; return r.count || 0; });
+  supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null).neq("type", "dm").then(r => { if (r.error) throw r.error; return r.count || 0; });
 export const markNotificationsRead = () => supabase.from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null).then(check);
 // Live: calls onNew whenever a notification for this user arrives. Returns an unsubscribe function.
 export function subscribeToNotifications(uid, onNew) {
   const ch = supabase.channel(`notifications:${uid}:${Math.random().toString(36).slice(2)}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` }, () => onNew())
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
+
+// ---------- Direct messages (1:1, Instagram-style; first messages from people you don't follow are requests) ----------
+const toThread = r => ({ id: r.id, other: { id: r.other_id, username: r.username, name: r.name, avatar: r.avatar_url },
+  isRequest: r.is_request, waiting: r.waiting, lastMessageAt: Date.parse(r.last_message_at), preview: r.last_preview,
+  fromMe: r.last_from_me, unread: r.unread, otherReadAt: r.other_read_at ? Date.parse(r.other_read_at) : null });
+const toDM = r => ({ id: r.id, threadId: r.thread_id, senderId: r.sender_id, content: r.content, createdAt: Date.parse(r.created_at) });
+export const loadInbox = () => supabase.rpc("dm_inbox").then(check).then(rows => rows.map(toThread));
+export const countUnreadDMs = () => supabase.rpc("dm_unread_count").then(check).then(n => +n || 0);
+// Finds or creates the conversation with someone; fails (42501) if either of you blocked the other.
+export const openThread = otherId => supabase.rpc("dm_open", { p_other: otherId }).then(check);
+export const loadThread = id => supabase.rpc("dm_inbox").then(check).then(rows => { const r = rows.find(t => t.id === id); return r ? toThread(r) : null; });
+export async function loadDMs(threadId) {
+  const rows = check(await supabase.from("direct_messages").select("*").eq("thread_id", threadId).order("created_at", { ascending: false }).limit(200));
+  return rows.reverse().map(toDM);
+}
+export const sendDM = (threadId, content) => supabase.from("direct_messages").insert({ thread_id: threadId, content }).select().single().then(check).then(toDM);
+export const unsendDM = id => supabase.from("direct_messages").delete().eq("id", id).then(check);
+export const markThreadRead = id => supabase.rpc("dm_mark_read", { p_thread: id }).then(check);
+export const acceptThread = id => supabase.rpc("dm_accept", { p_thread: id }).then(check);
+export const hideThread = id => supabase.rpc("dm_hide", { p_thread: id }).then(check);
+// Live: new messages in one conversation. Returns an unsubscribe function.
+export function subscribeToDMs(threadId, onNew) {
+  const ch = supabase.channel(`dms:${threadId}:${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages", filter: `thread_id=eq.${threadId}` }, p => onNew(toDM(p.new)))
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
+// Live: any change to my conversations (new message, read receipts, accepted). Returns an unsubscribe function.
+export function subscribeToThreads(onChange) {
+  const ch = supabase.channel(`dm-threads:${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "dm_threads" }, p => onChange(p.new))
     .subscribe();
   return () => supabase.removeChannel(ch);
 }

@@ -99,7 +99,7 @@ export default function WhoIsTraining({user,actions}){
           const iAdded=friends.added.includes(c.userId), theyAdded=friends.addedMe.includes(c.userId);
           return(
             <div key={c.userId} className="food-item">
-              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><Avatar profile={c.profile} size={34}/><div style={{minWidth:0}}><div className="food-name">@{c.profile.username}</div><div className="food-amount">{c.muscle?`${c.muscle} day · `:""}{minutesAgo(c.checkedInAt)}</div></div></div>
+              <button className="profile-link" style={{display:"flex",alignItems:"center",gap:10,minWidth:0}} onClick={()=>actions.openProfile(c.userId)}><Avatar profile={c.profile} size={34}/><div style={{minWidth:0}}><div className="food-name">@{c.profile.username}</div><div className="food-amount">{c.muscle?`${c.muscle} day · `:""}{minutesAgo(c.checkedInAt)}</div></div></button>
               {iAdded&&theyAdded?<span className="tag" style={tagStyle}>✓ Friends</span>
                 :iAdded?<button className="btn btn-sm btn-ghost" disabled>Requested</button>
                 :<button className="btn btn-sm" onClick={()=>addFriend(c.userId)}>{theyAdded?"Add back":"Add Friend"}</button>}

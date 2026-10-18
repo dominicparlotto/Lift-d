@@ -171,7 +171,7 @@ export default function ProfileTab({user,actions,startSheet,onStartHandled}){
         {requests.length===0&&<div className="comment-empty">No pending requests.</div>}
         {requests.map(p=>(
           <div key={p.id} className="food-item">
-            <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><Avatar profile={p} size={34}/><div style={{minWidth:0}}><div className="food-name">{p.name}</div><div className="food-amount">@{p.username}</div></div></div>
+            <button className="profile-link" style={{display:"flex",alignItems:"center",gap:10,minWidth:0}} onClick={()=>{setShowRequests(false);actions.openProfile(p.id);}}><Avatar profile={p} size={34}/><div style={{minWidth:0}}><div className="food-name">{p.name}</div><div className="food-amount">@{p.username}</div></div></button>
             <div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={()=>answer(p,true)}>Approve</button><button className="btn btn-sm btn-ghost" onClick={()=>answer(p,false)}>Decline</button></div>
           </div>
         ))}

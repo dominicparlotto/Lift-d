@@ -31,19 +31,20 @@ export function PostViewer({post,user,actions,onClose,onDeleted,onBlocked}){
     ?[{icon:"🗑️",label:"Delete post",danger:true,onSelect:async()=>{if(await actions.deletePost(post.id)){onDeleted?.(post.id);onClose();}}}]
     :[{icon:"🚩",label:"Report post",onSelect:()=>setReport(true)},{icon:"🚫",label:`Block @${a.username}`,danger:true,onSelect:()=>setBlock(true)}];
   async function doBlock(){const ok=await actions.block(a.id);if(ok){onBlocked?.();onClose();}return ok;}
+  const toProfile=()=>{onClose();actions.openProfile(a.id);};
   return(
     <div className="modal-overlay player-overlay" onClick={onClose}>
       <div className="post-viewer" onClick={e=>e.stopPropagation()}>
         <div className="post-header" style={{padding:"12px 14px 0"}}>
-          <Avatar profile={a} size={34}/>
-          <div style={{flex:1,minWidth:0}}><div className="post-username">@{a.username}</div><div className="post-time">{timeAgo(post.createdAt)}</div></div>
+          <button className="profile-link" onClick={toProfile} aria-label={`Open @${a.username}'s profile`}><Avatar profile={a} size={34}/></button>
+          <div style={{flex:1,minWidth:0}}><button className="profile-link post-username" onClick={toProfile}>@{a.username}</button><div className="post-time">{timeAgo(post.createdAt)}</div></div>
           <button className="post-more" onClick={()=>setMenu(true)} aria-label="Post options">⋯</button>
           <button className="post-more" onClick={onClose} aria-label="Close">✕</button>
         </div>
         {post.mediaType==="video"&&post.mediaUrl&&<video className="post-viewer-media" src={post.mediaUrl} controls autoPlay muted loop playsInline/>}
         {post.mediaType==="image"&&post.mediaUrl&&<img className="post-viewer-media" src={post.mediaUrl} alt=""/>}
         <div style={{padding:"10px 14px 14px"}}>
-          <div className="feed-caption" style={{marginTop:0}}><strong>@{a.username}</strong> {post.content}</div>
+          <div className="feed-caption" style={{marginTop:0}}><button className="profile-link" style={{fontWeight:700}} onClick={toProfile}>@{a.username}</button> {post.content}</div>
           <div className="post-actions" style={{marginTop:10}}>
             <button className={`action-btn ${actions.liked(post)?"liked":""}`} onClick={()=>actions.toggleLike(post)} aria-label="Like">
               <svg width="18" height="18" viewBox="0 0 24 24" fill={actions.liked(post)?"currentColor":"none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -106,7 +107,10 @@ export function UserProfile({userId,user,actions,onBack}){
           {profile.bio&&<div className="profile-bio">{profile.bio}</div>}
           {(profile.skill||profile.location)&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>{profile.skill&&<span className="skill-tag">{profile.skill}</span>}{profile.location&&<span style={{fontSize:12,color:"var(--muted)"}}>📍 {profile.location}</span>}</div>}
           {blockedByMe&&<button className="btn btn-ghost" style={{width:"100%",marginTop:14}} onClick={async()=>{if(await actions.unblock(userId)){setBlockedByMe(false);load();}}}>Unblock</button>}
-          {userId!==user.id&&!blockedByMe&&<button className={`btn ${following||requested?"btn-ghost":""}`} style={{width:"100%",marginTop:14}} onClick={toggleFollow}>{following?"Following":requested?"Requested":profile.isPrivate?"Request to follow":"Follow"}</button>}
+          {userId!==user.id&&!blockedByMe&&<div className="profile-btn-row">
+            <button className={`btn ${following||requested?"btn-ghost":""}`} onClick={toggleFollow}>{following?"Following":requested?"Requested":profile.isPrivate?"Request to follow":"Follow"}</button>
+            <button className="btn btn-ghost" onClick={()=>actions.openChat(userId)}>Message</button>
+          </div>}
         </div>
         <div style={{height:1,background:"var(--line)",margin:"16px 0 2px"}}/>
         {blockedByMe?(

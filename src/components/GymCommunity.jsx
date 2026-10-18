@@ -203,7 +203,7 @@ export function GymRoom({gymId,user,actions,onBack}){
           <button className="btn" style={{width:"100%"}} onClick={join} disabled={joining}>{joining?"Joining…":"Join gym"}</button>
         </div>
       ):view==="board"?(
-        <Leaderboards board={board} user={user}/>
+        <Leaderboards board={board} user={user} actions={actions}/>
       ):(
         <div className="chat-wrap" style={{flex:1,height:"auto",minHeight:0}}>
           <div className="channels"><div className="channel-label">Channels</div>{channels.map(ch=><div key={ch.id} className={`channel-item ${channelId===ch.id?"active":""}`} onClick={()=>setChannelId(ch.id)}>#{ch.name}</div>)}<button className="add-channel-btn" onClick={()=>setShowAddCh(true)}>+ Add</button></div>
@@ -213,7 +213,7 @@ export function GymRoom({gymId,user,actions,onBack}){
               {!loadingMsgs&&messages.length===0&&<div style={{color:"var(--muted)",fontSize:13,padding:12}}>No messages in #{channelName} yet — say hi 👋</div>}
               {messages.map(m=>(
                 <div key={m.id} className="msg">
-                  <div className="msg-header"><span className="msg-user">{m.authorId===user.id?"You":`@${m.author?.username||"member"}`}</span><span className="msg-time">{timeAgo(m.createdAt)}</span><button className="msg-more" onClick={()=>setMenu(m)} aria-label="Message options">⋯</button></div>
+                  <div className="msg-header"><button className="profile-link msg-user" onClick={()=>actions.openProfile(m.authorId)}>{m.authorId===user.id?"You":`@${m.author?.username||"member"}`}</button><span className="msg-time">{timeAgo(m.createdAt)}</span><button className="msg-more" onClick={()=>setMenu(m)} aria-label="Message options">⋯</button></div>
                   <div className="msg-text">{m.content}</div>
                 </div>
               ))}
@@ -251,7 +251,7 @@ const BOARDS=[
    show:e=>`${e.streak} ${e.streak===1?"week":"weeks"}`,sub:e=>`${e.daysThisWeek} ${e.daysThisWeek===1?"day":"days"} this week${e.daysThisWeek<5?` (${5-e.daysThisWeek} to go)`:" ✓"} · ${e.fiveDayWeeks} five-day ${e.fiveDayWeeks===1?"week":"weeks"} total`,
    note:"Weeks in a row with at least 5 different days of logged workouts. This week counts once you hit day 5."},
 ];
-function Leaderboards({board,user}){
+function Leaderboards({board,user,actions}){
   const units=unitsOf(user);
   const [id,setId]=useState("volume");
   const b=BOARDS.find(x=>x.id===id);
@@ -268,7 +268,7 @@ function Leaderboards({board,user}){
       {ranked.slice(0,25).map((e,i)=>(
         <div key={e.userId} className={`lb-row ${e.userId===user.id?"lb-me":""}`}>
           <div className={`lb-rank ${i===0?"gold":i===1?"silver":i===2?"bronze":""}`}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</div>
-          <div className="lb-name" style={{minWidth:0}}>@{e.username}{e.userId===user.id?" (you)":""}{b.sub&&<div style={{fontSize:11,color:"var(--muted)",fontWeight:500}}>{b.sub(e)}</div>}</div>
+          <div className="lb-name" style={{minWidth:0}}><button className="profile-link" style={{fontWeight:"inherit"}} onClick={()=>actions.openProfile(e.userId)}>@{e.username}</button>{e.userId===user.id?" (you)":""}{b.sub&&<div style={{fontSize:11,color:"var(--muted)",fontWeight:500}}>{b.sub(e)}</div>}</div>
           <div className="lb-score">{b.show(e,units)}</div>
         </div>
       ))}

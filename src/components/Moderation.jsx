@@ -38,7 +38,7 @@ export function ActionSheet({title,options,onClose}){
 export function ReportSheet({target,onReport,onBlock,onClose}){
   const [reason,setReason]=useState(""); const [details,setDetails]=useState("");
   const [busy,setBusy]=useState(false); const [done,setDone]=useState(false); const [blocked,setBlocked]=useState(false);
-  const what=target.type==="profile"?`@${target.username}`:`this ${target.type}`;
+  const what=target.type==="profile"?`@${target.username}`:`this ${target.type==="dm"?"message":target.type}`;
   async function submit(){
     if(!reason||busy)return;
     setBusy(true);

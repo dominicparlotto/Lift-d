@@ -6,6 +6,8 @@ import SocialTab from "./components/SocialTab";
 import CommunityTab from "./components/CommunityTab";
 import WorkoutTab from "./components/WorkoutTab";
 import ProfileTab from "./components/ProfileTab";
+import { UserProfile } from "./components/Profiles";
+import { MessagesInbox, ChatView } from "./components/Messages";
 import { supabase } from "./lib/supabase";
 import * as api from "./lib/api";
 import { dateKey } from "./utils/helpers";
@@ -36,8 +38,8 @@ export default function App(){
     window.addEventListener("hashchange",onHash);
     return ()=>window.removeEventListener("hashchange",onHash);
   },[]);
-  // Share links and push notifications open a specific thing: #post=ID, #clip=ID, #user=ID, #requests, #reports (admins).
-  const readLink=()=>{const m=window.location.hash.match(/^#(post|clip|user)=([0-9a-f-]{36})$/i);return m?{type:m[1],id:m[2]}:/^#(requests|reports)$/.test(window.location.hash)?{type:window.location.hash.slice(1)}:null;};
+  // Share links and push notifications open a specific thing: #post=ID, #clip=ID, #user=ID, #dm=USER_ID, #requests, #reports (admins).
+  const readLink=()=>{const m=window.location.hash.match(/^#(post|clip|user|dm)=([0-9a-f-]{36})$/i);return m?{type:m[1],id:m[2]}:/^#(requests|reports)$/.test(window.location.hash)?{type:window.location.hash.slice(1)}:null;};
   const [deepLink,setDeepLink]=useState(()=>{
     const l=readLink();
     try{if(l)sessionStorage.setItem("liftd.link",JSON.stringify(l));return l||JSON.parse(sessionStorage.getItem("liftd.link")||"null");}
@@ -51,11 +53,19 @@ export default function App(){
   function clearDeepLink(){
     setDeepLink(null);
     try{sessionStorage.removeItem("liftd.link");}catch{/* storage unavailable */}
-    if(/^#(post|clip|user)=|^#(requests|reports)$/.test(window.location.hash))window.history.replaceState(null,"",window.location.pathname);
+    if(/^#(post|clip|user|dm)=|^#(requests|reports)$/.test(window.location.hash))window.history.replaceState(null,"",window.location.pathname);
   }
   // Unread notifications (🔔 badge), kept live.
   const [unread,setUnread]=useState(0);
   const refreshUnread=()=>api.countUnreadNotifications().then(setUnread).catch(()=>{});
+  // Unread direct messages (badge on the ✈ button and the Feed tab).
+  const [dmUnread,setDmUnread]=useState(0);
+  const refreshDMs=()=>api.countUnreadDMs().then(setDmUnread).catch(()=>{});
+  // Screens opened on top of any tab — someone's profile, the Messages inbox, a chat — Instagram-style:
+  // Back pops one, tapping a tab closes them all. The tab underneath stays mounted (keeps its scroll/state).
+  const [screens,setScreens]=useState([]);
+  const pushScreen=s=>setScreens(st=>{const top=st[st.length-1];return top&&top.type===s.type&&top.id===s.id?st:[...st,s];});
+  const popScreen=()=>setScreens(st=>st.slice(0,-1));
 
   function clearJoinCode(){
     setJoinCode(null);
@@ -87,23 +97,32 @@ export default function App(){
   },[tab,user?.id]);
   useEffect(()=>{
     if(!user)return;
-    refreshUnread();
-    return api.subscribeToNotifications(user.id,refreshUnread);
+    refreshUnread();refreshDMs();
+    // A new message also creates a (hidden) "dm" notification, so this keeps both badges live.
+    return api.subscribeToNotifications(user.id,()=>{refreshUnread();refreshDMs();});
   },[user?.id]);
   // A share/notification link opens the Feed (posts, clips, people) or your Profile (follow requests, admin reports).
   const [profileSheet,setProfileSheet]=useState(null); // "reports" → Profile opens the Reports inbox
-  function openReports(){setProfileSheet("reports");setTab("profile");}
+  function openReports(){setProfileSheet("reports");goTab("profile");}
+  function goTab(id){setScreens([]);setTab(id);}
+  function openProfile(id){
+    if(!id)return;
+    if(id===user?.id){goTab("profile");return;}
+    pushScreen({type:"profile",id});
+  }
   useEffect(()=>{
     if(!user||!deepLink)return;
-    if(deepLink.type==="requests"){setTab("profile");clearDeepLink();}
+    if(deepLink.type==="requests"){goTab("profile");clearDeepLink();}
     else if(deepLink.type==="reports"){if(user.isAdmin)openReports();clearDeepLink();}
-    else setTab("social");
+    else if(deepLink.type==="dm"){pushScreen({type:"chat",id:deepLink.id});clearDeepLink();}
+    else if(deepLink.type==="user"){openProfile(deepLink.id);clearDeepLink();}
+    else goTab("social");
   },[user?.id,deepLink]);
   // Likes: shown instantly; overrides[key] is what the user has toggled since the item was loaded.
   const [likeOverrides,setLikeOverrides]=useState({});
   const likeKey=item=>item.kind==="curated"?item.key:`post:${item.id}`;
   // An invite link opens the Community tab, where the gym is joined and opened.
-  useEffect(()=>{if(user&&joinCode)setTab("community");},[user?.id,joinCode]);
+  useEffect(()=>{if(user&&joinCode)goTab("community");},[user?.id,joinCode]);
 
   function flash(msg){setToast(msg);setTimeout(()=>setToast(t=>t===msg?"":t),3500);}
   // Runs a save; on failure shows a message and returns false so the screen can keep the user's input.
@@ -137,6 +156,11 @@ export default function App(){
       }
     },
     unread,setUnread,refreshUnread,
+    dmUnread,refreshDMs,
+    // Anyone's username/avatar → their profile (your own opens the Profile tab).
+    openProfile,
+    openMessages:()=>pushScreen({type:"inbox"}),
+    openChat:userId=>{if(userId!==user.id)pushScreen({type:"chat",id:userId});},
     deepLink,clearDeepLink,openReports,
     logWorkout:entry=>attempt(async()=>{
       const day=dateKey();const saved=await api.insertWorkout(day,entry);
@@ -221,7 +245,7 @@ export default function App(){
     signOut:async()=>{
       await disablePush().catch(()=>{}); // stop this device getting the old account's alerts
       await supabase.auth.signOut();
-      setTab("nutrition");setPosts([]);
+      setTab("nutrition");setScreens([]);setPosts([]);
       window.history.replaceState(null,"",window.location.pathname); // drop #signup/#signin so the start screen shows
     },
     flash,
@@ -244,7 +268,7 @@ export default function App(){
       await disablePush().catch(()=>{});
       await api.deleteMyAccount(user.id);
       await supabase.auth.signOut().catch(()=>{}); // the account is already gone; this just clears the local session
-      setTab("nutrition");setPosts([]);setUser(null);
+      setTab("nutrition");setScreens([]);setPosts([]);setUser(null);
       window.history.replaceState(null,"",window.location.pathname);
     },"Couldn't delete your account — check your connection and try again."),
   };
@@ -262,18 +286,24 @@ export default function App(){
     {id:"profile",label:"Profile",icon:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
   ];
 
+  const screen=screens[screens.length-1];
   return(
     <div className="app">
       <div className="glow-top"/><div className="glow-bottom"/>
-      <div className="content">
+      <div className="content" style={screen?{display:"none"}:undefined}>
         {tab==="nutrition"&&<NutritionTab user={user} actions={actions} onOpenProfile={()=>setTab("profile")}/>}
         {tab==="social"&&<SocialTab user={user} posts={posts} actions={actions} onGoToProfile={()=>setTab("profile")}/>}
         {tab==="community"&&<CommunityTab user={user} actions={actions} joinCode={joinCode} onJoinHandled={clearJoinCode}/>}
         {tab==="workout"&&<WorkoutTab user={user} actions={actions}/>}
         {tab==="profile"&&<ProfileTab user={user} actions={actions} startSheet={profileSheet} onStartHandled={()=>setProfileSheet(null)}/>}
       </div>
+      {screen&&<div className="content" key={screens.length+":"+screen.type+":"+(screen.id||"")}>
+        {screen.type==="profile"&&<UserProfile userId={screen.id} user={user} actions={actions} onBack={popScreen}/>}
+        {screen.type==="inbox"&&<MessagesInbox user={user} actions={actions} onBack={popScreen}/>}
+        {screen.type==="chat"&&<ChatView userId={screen.id} user={user} actions={actions} onBack={()=>{popScreen();refreshDMs();}}/>}
+      </div>}
       {toast&&<div className="toast" role="status">{toast}</div>}
-      <nav className="nav">{tabs.map(t=><button key={t.id} className={`nav-btn ${tab===t.id?"active":""}`} onClick={()=>setTab(t.id)}><span className="nav-icon-wrap">{t.icon}{t.id==="social"&&unread>0&&<span className="nav-badge" aria-label={`${unread} new notifications`}>{unread>9?"9+":unread}</span>}</span>{t.label}<div className="nav-bar"/></button>)}</nav>
+      {screen?.type!=="chat"&&<nav className="nav">{tabs.map(t=>{const badge=t.id==="social"?unread+dmUnread:0;return <button key={t.id} className={`nav-btn ${tab===t.id&&!screen?"active":""}`} onClick={()=>goTab(t.id)}><span className="nav-icon-wrap">{t.icon}{badge>0&&<span className="nav-badge" aria-label={`${badge} new notifications and messages`}>{badge>9?"9+":badge}</span>}</span>{t.label}<div className="nav-bar"/></button>;})}</nav>}
     </div>
   );
 }

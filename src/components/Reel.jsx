@@ -99,9 +99,9 @@ export function CommentsSheet({item,user,actions,onClose,onCount}){
         {comments?.length===0&&<div className="comment-empty"><div style={{fontSize:15,fontWeight:700,color:"var(--text)",marginBottom:4}}>No comments yet</div>Start the conversation.</div>}
         {comments?.map(c=>(
           <div key={c.id} className="comment">
-            <Avatar profile={c.author} size={32}/>
+            <button className="profile-link" onClick={()=>{onClose();actions.openProfile(c.authorId);}} aria-label={`Open @${c.author.username}'s profile`}><Avatar profile={c.author} size={32}/></button>
             <div style={{flex:1,minWidth:0}}>
-              <div className="comment-meta"><strong>@{c.author.username}</strong><span>{timeAgo(c.createdAt)}</span></div>
+              <div className="comment-meta"><button className="profile-link" style={{fontWeight:700}} onClick={()=>{onClose();actions.openProfile(c.authorId);}}>@{c.author.username}</button><span>{timeAgo(c.createdAt)}</span></div>
               <div className="comment-text">{c.content}</div>
               <div className="comment-actions">
                 {canDelete(c)&&<button onClick={()=>remove(c)}>Delete</button>}
@@ -144,7 +144,7 @@ export function ClipPlayer({clip,user,actions,onClose}){
         <div className="player-info">
           {clip.kind==="curated"
             ?<div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}}><span className="learn-badge">FORM TIPS</span>Lift'd Learn</div>
-            :<div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}}><Avatar profile={clip.author} size={20}/>@{clip.author?.username}</div>}
+            :<button className="profile-link" style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,marginBottom:4}} onClick={()=>{onClose();actions.openProfile(clip.author.id);}}><Avatar profile={clip.author} size={20}/>@{clip.author?.username}</button>}
           <div style={{fontSize:15,fontWeight:700,lineHeight:1.35}}>{clip.title}</div>
           {clip.description&&<div style={{fontSize:13,color:"var(--muted)",marginTop:3,lineHeight:1.45}}>{clip.description}</div>}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:10}}>

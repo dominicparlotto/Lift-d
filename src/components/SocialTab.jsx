@@ -4,7 +4,8 @@ import { ActionSheet, ReportSheet, BlockSheet, Avatar } from "./Moderation";
 import { ReelVideo, useCue, CueBadge, CommentsSheet, CommentIcon } from "./Reel";
 import NewPostSheet from "./NewPostSheet";
 import NotificationsSheet from "./Notifications";
-import { UserProfile, PostViewer } from "./Profiles";
+import { PostViewer } from "./Profiles";
+import { PlaneIcon } from "./Messages";
 import * as api from "../lib/api";
 import { timeAgo } from "../utils/helpers";
 
@@ -24,9 +25,8 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
   const [reportTarget,setReportTarget]=useState(null);
   const [blockTarget,setBlockTarget]=useState(null);
   const [searchFocused,setSearchFocused]=useState(false);
-  const [profileId,setProfileId]=useState(null); // someone's profile opened from search or a post
   const [openPost,setOpenPost]=useState(null);
-  const openProfile=id=>{if(id===user.id){onGoToProfile?.();return;}setProfileId(id);};
+  const openProfile=actions.openProfile; // opens on top of the Feed (yours → Profile tab)
 
   // Clips (learning clips + members' videos) load for both Clips and the Feed — everything in Clips also shows in the Feed.
   const loadClips=()=>api.loadClips().then(setClips).catch(e=>{console.error(e);setClips([]);actions.flash("Couldn't load clips.");});
@@ -65,14 +65,13 @@ export default function SocialTab({user,posts,actions,onGoToProfile}){
     :[{icon:"🚩",label:"Report post",onSelect:()=>setReportTarget({type:"post",id:post.id,userId:post.author.id,username:post.author.username})},
       {icon:"🚫",label:`Block @${post.author.username}`,danger:true,onSelect:()=>setBlockTarget({userId:post.author.id,username:post.author.username})}];
 
-  if(profileId)return <UserProfile userId={profileId} user={user} actions={actions} onBack={()=>setProfileId(null)}/>;
   const searching=searchFocused||searchQ.trim().length>0;
 
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
       <div className="search-wrap">
         <div className="search-container"><svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input className="search-input" placeholder="Search people, exercises, clips…" value={searchQ} onFocus={()=>setSearchFocused(true)} onChange={e=>setSearchQ(e.target.value)}/>{searching&&<button className="search-cancel" onClick={()=>{setSearchQ("");setSearchFocused(false);}}>Cancel</button>}</div>
-        {!searching&&<div className="chip-row"><button className="bell-btn" onClick={()=>setShowInbox(true)} aria-label={actions.unread?`Notifications, ${actions.unread} new`:"Notifications"}>🔔{actions.unread>0&&<span className="bell-badge">{actions.unread>9?"9+":actions.unread}</span>}</button>{[["feed","🎬 Feed"],["clips","▶ Clips"]].map(([v,l])=><button key={v} className={`chip ${view===v?"active":""}`} onClick={()=>{setView(v);setSearchQ("");}}>{l}</button>)}{<button className={`chip ${showFilters?"active":""}`} onClick={()=>setShowFilters(p=>!p)}>⚙ Filter</button>}</div>}
+        {!searching&&<div className="chip-row">{[["feed","🎬 Feed"],["clips","▶ Clips"]].map(([v,l])=><button key={v} className={`chip ${view===v?"active":""}`} onClick={()=>{setView(v);setSearchQ("");}}>{l}</button>)}{<button className={`chip ${showFilters?"active":""}`} onClick={()=>setShowFilters(p=>!p)}>⚙ Filter</button>}<div className="feed-icons"><button className="bell-btn" onClick={()=>setShowInbox(true)} aria-label={actions.unread?`Notifications, ${actions.unread} new`:"Notifications"}>🔔{actions.unread>0&&<span className="bell-badge">{actions.unread>9?"9+":actions.unread}</span>}</button><button className="bell-btn" onClick={actions.openMessages} aria-label={actions.dmUnread?`Messages, ${actions.dmUnread} unread`:"Messages"}><PlaneIcon size={16}/>{actions.dmUnread>0&&<span className="bell-badge">{actions.dmUnread>9?"9+":actions.dmUnread}</span>}</button></div></div>}
         {showFilters&&!searching&&<div style={{paddingTop:8}}>
           <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"var(--muted2)",marginBottom:6}}>Muscle Group</div>
           <div className="filter-row">{["All","Chest","Back","Legs","Shoulders","Arms","Core","Cardio"].map(m=><button key={m} className={`filter-pill ${filterMuscle===m?"active":""}`} onClick={()=>setFilterMuscle(m)}>{m}</button>)}</div>

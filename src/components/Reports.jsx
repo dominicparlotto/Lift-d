@@ -4,7 +4,7 @@ import { timeAgo } from "../utils/helpers";
 import { Sheet, ActionSheet, Avatar } from "./Moderation";
 
 const REASON_LABEL={spam:"Spam or scam",harassment:"Harassment or bullying",hate:"Hate speech or symbols",nudity:"Nudity or sexual content",violence:"Violence or threats",self_harm:"Self-harm or eating disorder",misinformation:"Dangerous misinformation",other:"Something else"};
-const TYPE_LABEL={post:"Post",comment:"Comment",message:"Chat message",profile:"Account"};
+const TYPE_LABEL={post:"Post",comment:"Comment",message:"Chat message",dm:"Direct message",profile:"Account"};
 const STATUS_LABEL={open:"Open",dismissed:"Dismissed",actioned:"Actioned"};
 
 // Admin-only: everything people have reported. Remove the content, ban the account, or dismiss.
@@ -40,7 +40,7 @@ export default function ReportsInbox({actions,onClose}){
 
   // What can be done to a report depends on what was reported and whether it's still there.
   function options(r){
-    const canRemove=["post","comment","message"].includes(r.targetType)&&!r.contentGone;
+    const canRemove=["post","comment","message","dm"].includes(r.targetType)&&!r.contentGone;
     const canBan=r.targetUserId&&!r.targetBanned;
     const o=[];
     if(canRemove)o.push({icon:"🗑️",label:`Remove ${TYPE_LABEL[r.targetType].toLowerCase()}`,onSelect:()=>setConfirm({r,action:"remove"})});

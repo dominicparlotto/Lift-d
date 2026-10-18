@@ -47,9 +47,9 @@ export default function NotificationsSheet({user,actions,onClose,onOpenPost,onOp
       <div className="notif-list">
         {items?.map(n=>(
           <div key={n.id} className={`notif ${n.read?"":"unread"}`} role="button" tabIndex={0} onClick={()=>open(n)} onKeyDown={e=>{if(e.key==="Enter")open(n);}}>
-            <Avatar profile={n.actor} size={38}/>
+            <button className="profile-link" onClick={e=>{e.stopPropagation();onOpenProfile(n.actor.id);}} aria-label={`Open @${n.actor.username}'s profile`}><Avatar profile={n.actor} size={38}/></button>
             <div style={{flex:1,minWidth:0}}>
-              <div className="notif-text"><strong>@{n.actor.username}</strong> {TEXT[n.type]}{n.type==="comment"&&n.body&&<span> “{n.body}”</span>}{n.type==="report"&&<span> ({n.body?.replace(/_/g," ")}) — tap to review.</span>} <span className="notif-time">{timeAgo(n.createdAt)}</span></div>
+              <div className="notif-text"><button className="profile-link" style={{fontWeight:700}} onClick={e=>{e.stopPropagation();onOpenProfile(n.actor.id);}}>@{n.actor.username}</button> {TEXT[n.type]}{n.type==="comment"&&n.body&&<span> “{n.body}”</span>}{n.type==="report"&&<span> ({n.body?.replace(/_/g," ")}) — tap to review.</span>} <span className="notif-time">{timeAgo(n.createdAt)}</span></div>
               {n.type==="follow_request"&&(answered[n.id]
                 ?<div className="notif-time" style={{marginTop:4}}>{answered[n.id]}</div>
                 :<div style={{display:"flex",gap:6,marginTop:6}} onClick={e=>e.stopPropagation()}>
