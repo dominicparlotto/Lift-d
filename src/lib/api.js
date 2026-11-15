@@ -184,6 +184,10 @@ export const fetchProfile = id => supabase.from("profiles").select("*").eq("id",
 // ---------- Profiles, search, private accounts ----------
 // Post/follower/following counts (shown even for private accounts; null if they've blocked you).
 export const loadProfileStats = id => supabase.rpc("profile_stats", { p_user: id }).then(check).then(rows => rows?.[0] || null);
+// Someone's followers or who they follow (kind: "followers" | "following"). Empty if their account is private
+// and you don't follow them; blocked and banned accounts are left out by the database.
+export const loadFollowList = (id, kind) => supabase.rpc("follow_list", { p_user: id, p_kind: kind }).then(check)
+  .then(rows => (rows || []).map(r => ({ ...toProfile(r), followedAt: Date.parse(r.followed_at) })));
 // A person's posts — the database returns nothing if their account is private and you don't follow them.
 export async function loadUserPosts(id) {
   const rows = check(await supabase.from("posts").select(POST_SEL).eq("user_id", id).eq("mine.user_id", await myId()).order("created_at", { ascending: false }).limit(60));

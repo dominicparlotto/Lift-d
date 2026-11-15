@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import * as api from "../lib/api";
 import { timeAgo } from "../utils/helpers";
-import { Avatar, ActionSheet, ReportSheet, BlockSheet } from "./Moderation";
+import { Avatar, ActionSheet, ReportSheet, BlockSheet, Sheet } from "./Moderation";
 import { CommentsSheet, CommentIcon } from "./Reel";
 
 // Instagram-style 3-column grid of a person's posts. Videos show a ▶, text-only posts show their caption.
@@ -64,6 +64,85 @@ export function PostViewer({post,user,actions,onClose,onDeleted,onBlocked}){
   );
 }
 
+const backIcon=<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>;
+
+// Followers / Following lists (Instagram-style), opened by tapping the counts on a profile.
+// Tap a person to open their profile; Follow / Following on each row; on your own Followers you can Remove someone.
+export function FollowList({userId,kind,user,actions,onBack}){
+  const mine=userId===user.id;
+  const [tab,setTab]=useState(kind==="following"?"following":"followers");
+  const [lists,setLists]=useState({followers:null,following:null});
+  const [owner,setOwner]=useState(mine?user:null);
+  const [q,setQ]=useState("");
+  const [confirmRemove,setConfirmRemove]=useState(null);
+
+  useEffect(()=>{
+    if(!mine)api.fetchProfile(userId).then(setOwner).catch(()=>{});
+    for(const k of ["followers","following"])
+      api.loadFollowList(userId,k).then(rows=>setLists(l=>({...l,[k]:rows})))
+        .catch(e=>{console.error(e);setLists(l=>({...l,[k]:[]}));if(k===tab)actions.flash("Couldn't load this list — try again.");});
+  },[userId]);
+
+  const term=q.trim().toLowerCase().replace(/^@/,"");
+  const rows=(lists[tab]||[]).filter(p=>!term||`${p.username} ${p.name}`.toLowerCase().includes(term));
+  async function remove(p){
+    setConfirmRemove(null);
+    if(await actions.removeFollower(p.id))setLists(l=>({...l,followers:l.followers.filter(x=>x.id!==p.id)}));
+  }
+
+  return(
+    <div className="dm-screen">
+      <div className="dm-header">
+        <button className="dm-icon-btn" onClick={onBack} aria-label="Back">{backIcon}</button>
+        <div className="dm-title">{owner?.username||""}</div>
+      </div>
+      <div className="dm-tabs">
+        {[["followers","Followers"],["following","Following"]].map(([id,l])=>(
+          <button key={id} className={`dm-tab ${tab===id?"active":""}`} onClick={()=>{setTab(id);setQ("");}}>
+            {lists[id]?`${lists[id].length} `:""}{id==="followers"&&lists[id]?.length===1?"Follower":l}
+          </button>
+        ))}
+      </div>
+      <div style={{padding:"0 16px 6px"}}><input className="search-input dm-search" placeholder="Search" value={q} onChange={e=>setQ(e.target.value)}/></div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        {lists[tab]===null&&<div className="comment-empty">Loading…</div>}
+        {lists[tab]?.length===0&&<div className="saved-empty" style={{paddingTop:40}}>
+          <div style={{fontSize:36,marginBottom:10}}>👥</div>
+          <div style={{fontSize:14,fontWeight:700}}>{tab==="followers"?"No followers yet":mine?"You're not following anyone yet":"Not following anyone yet"}</div>
+          {mine&&<div style={{fontSize:12,marginTop:6}}>{tab==="followers"?"Post your PRs and join your gym's chat so people can find you.":"Search for people in the Feed to follow your gym crew."}</div>}
+        </div>}
+        {lists[tab]?.length>0&&rows.length===0&&<div className="comment-empty">No one matches “{q.trim()}”.</div>}
+        {rows.map(p=>{
+          const following=user.following.includes(p.id), requested=user.requested.includes(p.id);
+          return(
+            <div key={p.id} className="follow-row">
+              <button className="follow-row-who" onClick={()=>actions.openProfile(p.id)}>
+                <Avatar profile={p} size={46}/>
+                <div style={{minWidth:0,textAlign:"left"}}>
+                  <div className="dm-row-name">{p.username}{p.isPrivate&&<span style={{fontSize:11,marginLeft:4}} title="Private account">🔒</span>}</div>
+                  {p.name&&<div className="dm-row-preview"><span className="dm-row-text">{p.name}</span></div>}
+                </div>
+              </button>
+              {p.id!==user.id&&(mine&&tab==="followers"
+                ?<button className="btn btn-sm btn-ghost" onClick={()=>setConfirmRemove(p)}>Remove</button>
+                :<button className={`btn btn-sm ${following||requested?"btn-ghost":""}`} onClick={()=>actions.toggleFollow(p.id)}>{following?"Following":requested?"Requested":"Follow"}</button>)}
+            </div>
+          );
+        })}
+      </div>
+      {confirmRemove&&<Sheet onClose={()=>setConfirmRemove(null)}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><Avatar profile={confirmRemove} size={64}/></div>
+        <div className="modal-title" style={{textAlign:"center"}}>Remove follower?</div>
+        <div className="modal-sub" style={{textAlign:"center"}}>Lift'd won't tell @{confirmRemove.username} they were removed from your followers.{user.isPrivate?" They'll need to request to follow you again.":""}</div>
+        <div style={{display:"flex",gap:10}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setConfirmRemove(null)}>Cancel</button>
+          <button className="btn-danger" style={{flex:1,marginTop:0}} onClick={()=>remove(confirmRemove)}>Remove</button>
+        </div>
+      </Sheet>}
+    </div>
+  );
+}
+
 // Someone else's profile. Private accounts show their header and counts, but posts only to approved followers.
 export function UserProfile({userId,user,actions,onBack}){
   const [profile,setProfile]=useState(null); const [missing,setMissing]=useState(false);
@@ -98,7 +177,13 @@ export function UserProfile({userId,user,actions,onBack}){
         <div className="user-profile-head">
           <Avatar profile={profile} size={78}/>
           <div className="user-profile-stats">
-            {[["Posts",stats?.posts],["Followers",stats?.followers],["Following",stats?.following]].map(([l,v])=><div key={l}><div className="profile-stat-val">{v??"–"}</div><div className="profile-stat-lbl">{l}</div></div>)}
+            {[["Posts",stats?.posts],["Followers",stats?.followers,"followers"],["Following",stats?.following,"following"]].map(([l,v,list])=>{
+              const inner=<><div className="profile-stat-val">{v??"–"}</div><div className="profile-stat-lbl">{l}</div></>;
+              // Like Instagram: a private account's lists only open for approved followers.
+              return list&&!locked&&!blockedByMe
+                ?<button key={l} className="stat-btn" onClick={()=>actions.openFollows(userId,list)} aria-label={`${v??""} ${l}`}>{inner}</button>
+                :<div key={l}>{inner}</div>;
+            })}
           </div>
         </div>
         <div style={{padding:"10px 20px 0"}}>

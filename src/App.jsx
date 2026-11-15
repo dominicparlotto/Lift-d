@@ -6,7 +6,7 @@ import SocialTab from "./components/SocialTab";
 import CommunityTab from "./components/CommunityTab";
 import WorkoutTab from "./components/WorkoutTab";
 import ProfileTab from "./components/ProfileTab";
-import { UserProfile } from "./components/Profiles";
+import { UserProfile, FollowList } from "./components/Profiles";
 import { MessagesInbox, ChatView } from "./components/Messages";
 import { supabase } from "./lib/supabase";
 import * as api from "./lib/api";
@@ -65,7 +65,7 @@ export default function App(){
   // Screens opened on top of any tab — someone's profile, the Messages inbox, a chat — Instagram-style:
   // Back pops one, tapping a tab closes them all. The tab underneath stays mounted (keeps its scroll/state).
   const [screens,setScreens]=useState([]);
-  const pushScreen=s=>setScreens(st=>{const top=st[st.length-1];return top&&top.type===s.type&&top.id===s.id?st:[...st,s];});
+  const pushScreen=s=>setScreens(st=>{const top=st[st.length-1];return top&&top.type===s.type&&top.id===s.id&&top.kind===s.kind?st:[...st,s];});
   const popScreen=()=>setScreens(st=>st.slice(0,-1));
 
   // iPhone app: a joinliftd.com/app/… link, a liftd:// link or a tapped notification opened the app.
@@ -182,6 +182,8 @@ export default function App(){
     // Anyone's username/avatar → their profile (your own opens the Profile tab).
     openProfile,
     openMessages:()=>pushScreen({type:"inbox"}),
+    // Someone's Followers / Following list (kind: "followers" | "following").
+    openFollows:(userId,kind)=>pushScreen({type:"follows",id:userId,kind}),
     openChat:userId=>{if(userId!==user.id)pushScreen({type:"chat",id:userId});},
     deepLink,clearDeepLink,openReports,
     logWorkout:entry=>attempt(async()=>{
@@ -245,6 +247,8 @@ export default function App(){
     },"Couldn't change your privacy setting — try again."),
     approveFollower:followerId=>attempt(async()=>{await api.approveFollower(user.id,followerId);patch(u=>({followersCount:u.followersCount+1}));},"Couldn't approve — try again."),
     declineFollower:followerId=>attempt(()=>api.removeFollower(user.id,followerId),"Couldn't decline — try again."),
+    // Remove someone from your followers (from your Followers list).
+    removeFollower:followerId=>attempt(async()=>{await api.removeFollower(user.id,followerId);patch(u=>({followersCount:Math.max(0,u.followersCount-1)}));},"Couldn't remove — try again."),
     toggleSaveClip:async id=>{
       const on=user.savedClips.includes(id);
       const flip=()=>patch(u=>({savedClips:u.savedClips.includes(id)?u.savedClips.filter(c=>c!==id):[...u.savedClips,id]}));
@@ -321,8 +325,9 @@ export default function App(){
         {tab==="workout"&&<WorkoutTab user={user} actions={actions}/>}
         {tab==="profile"&&<ProfileTab user={user} actions={actions} startSheet={profileSheet} onStartHandled={()=>setProfileSheet(null)}/>}
       </div>
-      {screen&&<div className="content" key={screens.length+":"+screen.type+":"+(screen.id||"")}>
+      {screen&&<div className="content" key={screens.length+":"+screen.type+":"+(screen.id||"")+":"+(screen.kind||"")}>
         {screen.type==="profile"&&<UserProfile userId={screen.id} user={user} actions={actions} onBack={popScreen}/>}
+        {screen.type==="follows"&&<FollowList userId={screen.id} kind={screen.kind} user={user} actions={actions} onBack={popScreen}/>}
         {screen.type==="inbox"&&<MessagesInbox user={user} actions={actions} onBack={popScreen}/>}
         {screen.type==="chat"&&<ChatView userId={screen.id} user={user} actions={actions} onBack={()=>{popScreen();refreshDMs();}}/>}
       </div>}

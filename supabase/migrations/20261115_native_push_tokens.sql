@@ -1,4 +1,4 @@
--- iPhone app push: one row per device token from Apple. Applied with the Supabase MCP (migration "native_push_tokens").
+-- iPhone app push: one row per device token from Apple. Applied 2026-11-15 (migration "native_push_tokens").
 create table public.native_push_tokens (
   token text primary key check (token ~ '^[0-9a-f]{32,200}$'),
   user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,

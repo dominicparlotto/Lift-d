@@ -10,12 +10,12 @@ Steps marked **(you)** need your accounts, password or money. Everything else is
    ```
 2. **(you)** Open Xcode once. Let it install components, and if it asks, download the **iOS** platform (Xcode → Settings → Components).
 
-## 2. Supabase
+## 2. Supabase ✅ (restored Nov 15, 2026)
 
-The project is paused, so the app can't load data until it's restored.
-
-- **(you)** Supabase dashboard → project *liftd* → **Restore project**. If it refuses because the free quota is still used up, upgrade the organisation to **Pro ($25/month)**. You'll want Pro before launch anyway: free projects pause after a week without activity, and Pro adds daily backups.
-- Then Claude applies `supabase/pending/native_push_tokens.sql`, deploys `supabase/functions/send-push`, and re-runs the security advisors.
+- The iPhone push table and the updated push sender are live (Nov 15).
+- **(you)** Before launch, upgrade the organisation to **Pro ($25/month)**:
+  - free projects pause after a week without activity, and when the usage quota runs out
+  - Pro adds daily backups
 
 ## 3. Apple Developer Program ($99/year)
 
