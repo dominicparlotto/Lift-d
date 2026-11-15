@@ -414,6 +414,10 @@ export async function savePushSubscription(sub) {
 }
 export const deletePushSubscription = endpoint => supabase.from("push_subscriptions").delete().eq("endpoint", endpoint).then(check);
 export const hasPushSubscription = endpoint => supabase.from("push_subscriptions").select("id").eq("endpoint", endpoint).maybeSingle().then(check).then(r => !!r);
+// iPhone app: Apple push tokens. Saved through an RPC so a token moves to whoever is signed in on that phone now.
+export const saveNativePushToken = token => supabase.rpc("register_native_push", { p_token: token }).then(check);
+export const deleteNativePushToken = token => supabase.from("native_push_tokens").delete().eq("token", token.toLowerCase()).then(check);
+export const hasNativePushToken = token => supabase.from("native_push_tokens").select("token").eq("token", token.toLowerCase()).maybeSingle().then(check).then(r => !!r);
 
 // Admin moderation (Settings → Reports). The RPCs refuse anyone who isn't an admin.
 export async function adminReports(status = "open") {

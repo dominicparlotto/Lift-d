@@ -4,6 +4,7 @@ import { timeAgo, currentWeek } from "../utils/helpers";
 import { unitsOf, fmtW, fmtD } from "../utils/units";
 import { Sheet, ActionSheet, ReportSheet, BlockSheet } from "./Moderation";
 import { hasProfanity, isProfanityError, PROFANITY_MESSAGE } from "../utils/profanity";
+import { appPageUrl } from "../lib/native";
 
 const backBtn={background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontSize:13,fontWeight:700,marginBottom:4,padding:0};
 const plural=(n,word)=>`${n} ${word}${n===1?"":"s"}`;
@@ -163,7 +164,7 @@ export function GymRoom({gymId,user,actions,onBack}){
   async function leave(){
     try{await api.leaveGym(user.id,gymId);onBack();}catch(e){console.error(e);actions.flash("Couldn't leave the gym — try again.");}
   }
-  const inviteLink=()=>`${window.location.origin}${window.location.pathname}#join=${gym.inviteCode}`;
+  const inviteLink=()=>`${appPageUrl()}#join=${gym.inviteCode}`;
   function copyInvite(){
     const done=()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);};
     if(navigator.clipboard?.writeText)navigator.clipboard.writeText(inviteLink()).then(done).catch(()=>actions.flash("Couldn't copy — press and hold the link to copy it."));
@@ -192,7 +193,7 @@ export function GymRoom({gymId,user,actions,onBack}){
         <div style={{minWidth:0}}><button onClick={onBack} style={backBtn}>← Gyms</button><div className="header-title" style={{fontSize:17}}>{gym.name}</div><div className="header-sub">{plural(gym.memberCount,"member")}{gym.location?` · ${gym.location}`:""}</div></div>
         {member&&<div style={{display:"flex",gap:8,flexShrink:0}}><button className={`btn btn-sm ${view==="board"?"":"btn-ghost"}`} onClick={()=>setView(v=>v==="board"?"chat":"board")} aria-label="Leaderboard">🏆</button><button className="btn btn-sm btn-ghost" onClick={()=>setMenu("gym")} aria-label="Gym options">⋯</button></div>}
       </div>
-      {member&&<div className="invite-box"><span>🔗</span><span className="invite-link">{window.location.host}{window.location.pathname}#join={gym.inviteCode}</span><button className="copy-btn" onClick={copyInvite}>{copied?"✓ Copied!":"Copy"}</button></div>}
+      {member&&<div className="invite-box"><span>🔗</span><span className="invite-link">{inviteLink().replace(/^https?:\/\//,"")}</span><button className="copy-btn" onClick={copyInvite}>{copied?"✓ Copied!":"Copy"}</button></div>}
       {liveCount>0&&<div className="invite-box" style={{background:"rgba(62,207,207,0.08)",borderColor:"rgba(62,207,207,0.25)",flexShrink:0}}><span>🟢</span><span className="invite-link" style={{color:"var(--text)"}}>{liveCount} {liveCount===1?"person is":"people are"} training here now</span></div>}
 
       {!member?(

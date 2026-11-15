@@ -5,13 +5,14 @@ import { isUsernameAvailable } from "../lib/api";
 import { PASSWORD_RULES, validateUsername, friendlyAuthError } from "../utils/validation";
 import PasswordInput from "./PasswordInput";
 import { hasProfanity, PROFANITY_MESSAGE } from "../utils/profanity";
+import { appPageUrl } from "../lib/native";
 
 export const TERMS_URL="https://joinliftd.com/terms/", PRIVACY_URL="https://joinliftd.com/privacy/";
 
 // Logo mark lives at the site root (public/favicon.svg); the app is served from /app/, so it's one level up.
 const LOGO="../favicon.svg";
 // Where links in sign-up / password-reset emails send people back to (this app page).
-const appUrl=()=>`${window.location.origin}${window.location.pathname}`;
+const appUrl=appPageUrl;
 const backBtn={background:"none",border:"none",color:"var(--accent)",font:"700 14px var(--font)",cursor:"pointer",marginBottom:20};
 
 function PasswordChecklist({pass}){

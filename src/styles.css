@@ -522,3 +522,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);}
 .profile-btn-row .btn{flex:1;}
 .msg-user.profile-link{color:var(--accent);font-weight:700;font-size:13px;}
 .post-username.profile-link{font-weight:700;}
+/* iPhone notch + home indicator (app/index.html sets viewport-fit=cover; these are 0 on other screens). */
+.app{padding-top:env(safe-area-inset-top);}
+.nav{padding-bottom:calc(14px + env(safe-area-inset-bottom));}
+.modal-sheet{padding-bottom:calc(36px + env(safe-area-inset-bottom));}
+.dm-input-bar{padding-bottom:calc(16px + env(safe-area-inset-bottom));}
+.toast{bottom:calc(92px + env(safe-area-inset-bottom));}
+.chat-wrap{height:calc(100vh - 155px - env(safe-area-inset-top) - env(safe-area-inset-bottom));}
+.auth-screen,.app-loading{min-height:calc(100vh - env(safe-area-inset-top));}
+/* iPhone app: no rubber-band page, no grey tap flash, no "copy/look up" bubble on buttons and images. */
+html.native,html.native body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}
+html.native button,html.native .nav,html.native img,html.native video{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}

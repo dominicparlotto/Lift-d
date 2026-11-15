@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "../lib/api";
 import { hasProfanity, isProfanityError, PROFANITY_MESSAGE } from "../utils/profanity";
+import { haptic } from "../lib/native";
 import { Sheet, ActionSheet, ReportSheet, BlockSheet, Avatar } from "./Moderation";
 
 const back=<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>;
@@ -137,6 +138,7 @@ export function ChatView({userId,user,actions,onBack}){
     setSending(true);
     try{
       const m=await api.sendDM(threadId,content);
+      haptic();
       setMessages(list=>list.some(x=>x.id===m.id)?list:[...list,m]);setText("");scrollDown(true);
       refreshThread(threadId).then(()=>actions.refreshDMs());
     }catch(e){console.error(e);actions.flash(isProfanityError(e)?PROFANITY_MESSAGE:e?.code==="42501"?"You can't message this account.":"Couldn't send — check your connection.");}

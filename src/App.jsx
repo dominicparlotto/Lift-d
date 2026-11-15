@@ -12,10 +12,11 @@ import { supabase } from "./lib/supabase";
 import * as api from "./lib/api";
 import { dateKey } from "./utils/helpers";
 import { friendlyAuthError } from "./utils/validation";
-import { disablePush } from "./lib/push";
+import { disablePush, refreshNativePush } from "./lib/push";
+import { appLink, shareLink, haptic, hideSplash, onAppLink } from "./lib/native";
 import { isProfanityError, PROFANITY_MESSAGE } from "./utils/profanity";
 
-const shell={maxWidth:430,margin:"0 auto",height:"100vh",overflow:"auto",background:"var(--bg)"};
+const shell={maxWidth:430,margin:"0 auto",height:"100vh",overflow:"auto",background:"var(--bg)",paddingTop:"env(safe-area-inset-top)"};
 
 export default function App(){
   const [session,setSession]=useState(undefined); // undefined = still checking for a saved login
@@ -67,6 +68,20 @@ export default function App(){
   const pushScreen=s=>setScreens(st=>{const top=st[st.length-1];return top&&top.type===s.type&&top.id===s.id?st:[...st,s];});
   const popScreen=()=>setScreens(st=>st.slice(0,-1));
 
+  // iPhone app: a joinliftd.com/app/… link, a liftd:// link or a tapped notification opened the app.
+  // Email sign-in links carry the session in the hash; everything else is a normal #post=… style link.
+  useEffect(()=>onAppLink(hash=>{
+    const p=new URLSearchParams(hash);
+    if(p.get("error_description")){flash("That link has expired — request a new one.");return;}
+    if(p.get("access_token")&&p.get("refresh_token")){
+      supabase.auth.setSession({access_token:p.get("access_token"),refresh_token:p.get("refresh_token")})
+        .then(({error})=>{if(error)throw error;if(p.get("type")==="recovery")setRecovering(true);})
+        .catch(e=>{console.error(e);flash("That link has expired — request a new one.");});
+      return;
+    }
+    window.location.hash=hash; // the hashchange listeners above take it from here
+  }),[]);
+
   function clearJoinCode(){
     setJoinCode(null);
     try{sessionStorage.removeItem("liftd.join");}catch{/* storage unavailable */}
@@ -81,6 +96,12 @@ export default function App(){
     });
     return ()=>subscription.unsubscribe();
   },[]);
+
+  // iPhone app: the splash screen stays up until we know whether someone is signed in.
+  const ready=session!==undefined&&(!session||!!user||!!loadError);
+  useEffect(()=>{if(ready)hideSplash();},[ready]);
+  // iPhone app: keep this phone's push token current for the signed-in account.
+  useEffect(()=>{if(user?.id)refreshNativePush();},[user?.id]);
 
   // Load the account whenever a different user signs in (not on routine token refreshes).
   const uid=session?.user?.id;
@@ -104,7 +125,7 @@ export default function App(){
   // A share/notification link opens the Feed (posts, clips, people) or your Profile (follow requests, admin reports).
   const [profileSheet,setProfileSheet]=useState(null); // "reports" → Profile opens the Reports inbox
   function openReports(){setProfileSheet("reports");goTab("profile");}
-  function goTab(id){setScreens([]);setTab(id);}
+  function goTab(id){if(id!==tab)haptic("selection");setScreens([]);setTab(id);}
   function openProfile(id){
     if(!id)return;
     if(id===user?.id){goTab("profile");return;}
@@ -137,17 +158,18 @@ export default function App(){
     likeCount:item=>{const k=likeKey(item),o=likeOverrides[k];return Math.max(0,(item.likeCount||0)+(o===undefined?0:(o?1:0)-(item.likedByMe?1:0)));},
     toggleLike:async item=>{
       const k=likeKey(item), next=!(likeOverrides[k]??!!item.likedByMe);
+      if(next)haptic();
       setLikeOverrides(o=>({...o,[k]:next}));
       try{await api.setLike(item,next);}
       catch(e){console.error(e);setLikeOverrides(o=>({...o,[k]:!next}));flash("Couldn't save your like — try again.");}
     },
-    // Share a post or clip: the phone's share sheet, or copy the link on a computer.
+    // Share a post or clip: the phone's share sheet, or copy the link on a computer. Links always point at joinliftd.com.
     share:async item=>{
-      const url=`${window.location.origin}/app/#${item.kind==="curated"?`clip=${item.id}`:`post=${item.id}`}`;
+      const url=appLink(item.kind==="curated"?`clip=${item.id}`:`post=${item.id}`);
       const who=item.kind==="curated"?"Lift'd Learn":`@${item.author?.username}`;
       const text=item.kind==="curated"?`${item.title} — form tips on Lift'd`:`${who} on Lift'd: ${(item.content||"").slice(0,100)}`;
       try{
-        if(navigator.share){await navigator.share({title:"Lift'd",text,url});return;}
+        if(await shareLink({title:"Lift'd",text,url}))return;
         await navigator.clipboard.writeText(url);flash("Link copied — paste it anywhere to share.");
       }catch(e){
         if(e?.name==="AbortError")return; // closed the share sheet
@@ -164,6 +186,7 @@ export default function App(){
     deepLink,clearDeepLink,openReports,
     logWorkout:entry=>attempt(async()=>{
       const day=dateKey();const saved=await api.insertWorkout(day,entry);
+      haptic("success");
       patch(u=>({workouts:{...u.workouts,[day]:[...(u.workouts[day]||[]),saved]}}));
     }),
     addCustomExercise:(group,name)=>attempt(async()=>{
@@ -189,6 +212,7 @@ export default function App(){
       try{
         const saved=await api.insertPost({...post,mediaType:media?.mediaType,mediaPath:media?.path,mediaUrl:media?.url});
         patch(u=>({posts:[saved,...u.posts]}));
+        haptic("success");
         setPosts(ps=>[{...saved,author:user},...ps]);
       }catch(e){
         if(media)await api.removePostMedia(media.path).catch(()=>{}); // don't leave an orphaned upload
@@ -209,7 +233,7 @@ export default function App(){
       const was=user.following.includes(id)?"following":user.requested.includes(id)?"requested":null;
       const set=state=>patch(u=>({following:state==="following"?[...u.following.filter(f=>f!==id),id]:u.following.filter(f=>f!==id),requested:state==="requested"?[...u.requested.filter(f=>f!==id),id]:u.requested.filter(f=>f!==id)}));
       if(was){set(null);if(!await attempt(()=>api.unfollow(user.id,id)))set(was);return;}
-      set("following");
+      set("following");haptic();
       try{const status=await api.follow(id);set(status==="pending"?"requested":"following");}
       catch(e){console.error(e);set(null);flash("Couldn't follow — try again.");}
     },

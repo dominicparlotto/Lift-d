@@ -1,0 +1,31 @@
+{
+  "appId": "com.joinliftd.app",
+  "appName": "Lift'd",
+  "webDir": "dist-native",
+  "backgroundColor": "#080C18",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#080C18",
+    "limitsNavigationsToAppBoundDomains": false,
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "launchShowDuration": 0,
+      "backgroundColor": "#080C18",
+      "showSpinner": false
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    }
+  }
+}

@@ -10,6 +10,7 @@ import ReportsInbox from "./Reports";
 import PRShareSheet from "./PRShare";
 import { getTheme, setTheme } from "../utils/theme";
 import { pushSupport, isPushOn, enablePush, disablePush } from "../lib/push";
+import { isNative } from "../lib/native";
 import { unitsOf, fmtW, wShow, wLabel } from "../utils/units";
 import { BlockedAccountsSheet, DeleteAccountSheet, Sheet, Avatar } from "./Moderation";
 import NewPostSheet from "./NewPostSheet";
@@ -24,7 +25,7 @@ const chevron=<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke
 
 export default function ProfileTab({user,actions,startSheet,onStartHandled}){
   const [tab,setTab]=useState("posts");
-  // Push notifications for this device (real Web Push; see src/lib/push.js).
+  // Push notifications for this device (Web Push on the website, Apple push in the iPhone app; see src/lib/push.js).
   const [push,setPush]=useState({on:false,busy:false,support:pushSupport()});
   const [showNewPost,setShowNewPost]=useState(false);
   const [openPost,setOpenPost]=useState(null); // own post opened from the grid
@@ -60,14 +61,14 @@ export default function ProfileTab({user,actions,startSheet,onStartHandled}){
     }catch(e){
       setPush({on:false,busy:false,support:pushSupport()});
       const why=e?.message;
-      actions.flash(why==="denied"?"Notifications are blocked — allow them for Lift'd in your browser or phone settings, then try again."
+      actions.flash(why==="denied"?(isNative?"Notifications are off for Lift'd — turn them on in iPhone Settings → Notifications → Lift'd, then try again.":"Notifications are blocked — allow them for Lift'd in your browser or phone settings, then try again.")
         :why==="needs-install"?"On iPhone, add Lift'd to your Home Screen first (Share → Add to Home Screen), open it from there, then turn this on."
         :why==="unsupported"?"This browser doesn't support push notifications — you'll still see everything in the 🔔 inbox."
         :why==="dismissed"?"No problem — turn it on whenever you're ready.":"Couldn't turn on notifications — try again.");
     }
   }
   const pushSub=push.support==="needs-install"?"iPhone: add Lift'd to your Home Screen first"
-    :push.support==="denied"?"Blocked in your browser settings"
+    :push.support==="denied"?(isNative?"Off in iPhone Settings → Notifications":"Blocked in your browser settings")
     :push.support==="unsupported"?"Not supported in this browser — check the 🔔 inbox"
     :push.on?"Likes, comments and followers on this device":"Get alerts on this device";
 
@@ -151,6 +152,7 @@ export default function ProfileTab({user,actions,startSheet,onStartHandled}){
         <div className="settings-section"><div className="settings-section-label">Preferences</div><div className="settings-list"><div className="settings-row"><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>🌙</div><div><div className="settings-label">Dark Mode</div><div className="settings-sub">{dark?"On":"Off — light mode"}</div></div></div><label className="toggle"><input type="checkbox" checked={dark} onChange={e=>{setDark(e.target.checked);setTheme(e.target.checked?"dark":"light");}}/><div className="toggle-track"/><div className="toggle-thumb"/></label></div><div className="settings-row" onClick={()=>actions.saveNutrition({...user.nutrition,units:units==="imperial"?"metric":"imperial"})}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>📏</div><div><div className="settings-label">Units</div></div></div><div className="settings-right"><span style={{fontSize:12,fontWeight:600,color:"var(--accent)"}}>{units==="imperial"?"lbs · mi · ft":"kg · km · cm"}</span>{chevron}</div></div></div></div>
         <div className="settings-section"><div className="settings-section-label">Support</div><div className="settings-list">
           <div className="settings-row" onClick={()=>setShowFeedback(true)}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>💬</div><div><div className="settings-label">Send Feedback</div><div className="settings-sub">Report a bug or suggest an idea</div></div></div><div className="settings-right">{chevron}</div></div>
+          <a className="settings-row" href="https://joinliftd.com/support/" target="_blank" rel="noopener" style={{textDecoration:"none",color:"inherit"}}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(79,142,247,0.15)"}}>❓</div><div><div className="settings-label">Help &amp; Support</div></div></div><div className="settings-right">{chevron}</div></a>
           <a className="settings-row" href="https://joinliftd.com/terms/" target="_blank" rel="noopener" style={{textDecoration:"none",color:"inherit"}}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(192,132,252,0.15)"}}>📄</div><div><div className="settings-label">Terms of Use</div></div></div><div className="settings-right">{chevron}</div></a>
           <a className="settings-row" href="https://joinliftd.com/privacy/" target="_blank" rel="noopener" style={{textDecoration:"none",color:"inherit"}}><div className="settings-row-left"><div className="settings-icon" style={{background:"rgba(62,207,207,0.15)"}}>🛡️</div><div><div className="settings-label">Privacy Policy</div></div></div><div className="settings-right">{chevron}</div></a>
         </div></div>

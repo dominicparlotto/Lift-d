@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.joinliftd.app"],
+        "components": [
+          { "/": "/app/*", "comment": "Post, clip, profile, DM and gym-invite links open the iPhone app" },
+          { "/": "/app", "comment": "The app page itself" }
+        ]
+      }
+    ]
+  }
+}
